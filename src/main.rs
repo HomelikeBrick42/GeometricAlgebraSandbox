@@ -390,6 +390,7 @@ impl eframe::App for App {
                     egui::TextEdit::multiline(&mut self.code)
                         .id_salt("code")
                         .code_editor()
+                        .desired_width(f32::INFINITY)
                         .min_size(ui.available_size()),
                 );
             });
