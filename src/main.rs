@@ -1,6 +1,7 @@
 use crate::rendering::{GpuCamera, GpuQuad, RenderData, RenderState};
 use eframe::{egui, wgpu};
 
+pub mod multivector;
 pub mod rendering;
 
 struct App {
