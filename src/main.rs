@@ -310,6 +310,10 @@ impl eframe::App for App {
                                 }
                             });
 
+                            if ui.button("Normalise").clicked() {
+                                parameter.value = parameter.value.normalised();
+                            }
+
                             let (grade0, grade1, grade2, grade3) = match parameter.type_ {
                                 ParameterType::Grade0 => (true, false, false, false),
                                 ParameterType::Grade1 => (false, true, false, false),
