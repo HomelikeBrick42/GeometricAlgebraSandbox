@@ -34,8 +34,6 @@ pub struct Token<'source> {
 
 #[derive(Debug, Display)]
 pub enum TokenKind<'source> {
-    #[display("{{invalid}}")]
-    Invalid,
     #[display("{_0}")]
     Name(&'source str),
     #[display("{_0}")]
