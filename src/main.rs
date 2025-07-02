@@ -287,6 +287,8 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+        let mut code_or_parameters_changed = self.last_time.is_none(); // hacky way to detect first time code has run
+
         let time = std::time::Instant::now();
         let dt = (time - self.last_time.unwrap_or(time)).as_secs_f32();
         self.last_time = Some(time);
@@ -411,6 +413,7 @@ impl eframe::App for App {
                                         ParameterType::Grade3 => parameter.value.grade3(),
                                         ParameterType::Multivector => parameter.value,
                                     };
+                                    code_or_parameters_changed = true;
                                 }
                             });
 
@@ -426,7 +429,7 @@ impl eframe::App for App {
                                 ParameterType::Multivector => (true, true, true, true),
                             };
 
-                            edit_multivector(
+                            code_or_parameters_changed |= edit_multivector(
                                 ui,
                                 &mut parameter.value,
                                 grade0,
@@ -436,6 +439,7 @@ impl eframe::App for App {
                             );
 
                             delete = ui.button("Delete").clicked();
+                            code_or_parameters_changed |= delete;
                         });
 
                     i += 1;
@@ -453,16 +457,20 @@ impl eframe::App for App {
                         ui.label(egui::RichText::new(error).color(egui::Color32::RED));
                     }
                 }
-                ui.add(
-                    egui::TextEdit::multiline(&mut self.code)
-                        .id_salt("code")
-                        .code_editor()
-                        .desired_width(f32::INFINITY)
-                        .min_size(ui.available_size()),
-                );
+                code_or_parameters_changed |= ui
+                    .add(
+                        egui::TextEdit::multiline(&mut self.code)
+                            .id_salt("code")
+                            .code_editor()
+                            .desired_width(f32::INFINITY)
+                            .min_size(ui.available_size()),
+                    )
+                    .changed();
             });
 
-        self.update_code();
+        if code_or_parameters_changed {
+            self.update_code();
+        }
 
         egui::Window::new("Values To Display")
             .open(&mut self.values_to_display_window_open)
@@ -660,47 +668,65 @@ fn edit_multivector(
     grade1: bool,
     grade2: bool,
     grade3: bool,
-) {
+) -> bool {
+    let mut changed = false;
     if grade0 {
         ui.horizontal(|ui| {
             ui.label("Scalar:");
-            ui.add(egui::DragValue::new(&mut value.s).speed(0.1));
+            changed |= ui
+                .add(egui::DragValue::new(&mut value.s).speed(0.1))
+                .changed();
         });
     }
     if grade1 {
         ui.horizontal(|ui| {
             ui.label("e0:");
-            ui.add(egui::DragValue::new(&mut value.e0).speed(0.1));
+            changed |= ui
+                .add(egui::DragValue::new(&mut value.e0).speed(0.1))
+                .changed();
         });
         ui.horizontal(|ui| {
             ui.label("e1:");
-            ui.add(egui::DragValue::new(&mut value.e1).speed(0.1));
+            changed |= ui
+                .add(egui::DragValue::new(&mut value.e1).speed(0.1))
+                .changed();
         });
         ui.horizontal(|ui| {
             ui.label("e2:");
-            ui.add(egui::DragValue::new(&mut value.e2).speed(0.1));
+            changed |= ui
+                .add(egui::DragValue::new(&mut value.e2).speed(0.1))
+                .changed();
         });
     }
     if grade2 {
         ui.horizontal(|ui| {
             ui.label("e01:");
-            ui.add(egui::DragValue::new(&mut value.e01).speed(0.1));
+            changed |= ui
+                .add(egui::DragValue::new(&mut value.e01).speed(0.1))
+                .changed();
         });
         ui.horizontal(|ui| {
             ui.label("e02:");
-            ui.add(egui::DragValue::new(&mut value.e02).speed(0.1));
+            changed |= ui
+                .add(egui::DragValue::new(&mut value.e02).speed(0.1))
+                .changed();
         });
         ui.horizontal(|ui| {
             ui.label("e12:");
-            ui.add(egui::DragValue::new(&mut value.e12).speed(0.1));
+            changed |= ui
+                .add(egui::DragValue::new(&mut value.e12).speed(0.1))
+                .changed();
         });
     }
     if grade3 {
         ui.horizontal(|ui| {
             ui.label("e012:");
-            ui.add(egui::DragValue::new(&mut value.e012).speed(0.1));
+            changed |= ui
+                .add(egui::DragValue::new(&mut value.e012).speed(0.1))
+                .changed();
         });
     }
+    changed
 }
 
 fn main() -> eframe::Result<()> {
