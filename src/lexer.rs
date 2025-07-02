@@ -86,6 +86,10 @@ impl<'source> Lexer<'source> {
         Some(c)
     }
 
+    pub fn location(&self) -> Location {
+        self.location
+    }
+
     pub fn next_token(&mut self) -> Result<Option<Token<'source>>, LexerError> {
         loop {
             let start_location = self.location;

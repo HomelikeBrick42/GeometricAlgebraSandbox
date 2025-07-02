@@ -1,6 +1,6 @@
 use crate::{
-    lexer::Lexer,
     multivector::Multivector,
+    parsing::{AstExpression, AstExpressionKind, AstStatementKind, BinaryOperator, parse},
     rendering::{GpuCamera, GpuCircle, GpuQuad, RenderData, RenderState},
 };
 use eframe::{egui, wgpu};
@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 pub mod lexer;
 pub mod multivector;
+pub mod parsing;
 pub mod rendering;
 
 struct App {
@@ -197,13 +198,79 @@ impl App {
         }
 
         self.errors.clear();
-        {
-            let mut lexer = Lexer::new(&self.code);
-            loop {
-                match lexer.next_token() {
-                    Ok(None) => break,
-                    Ok(Some(token)) => self.errors.push(format!("{}: {token}", token.location)),
-                    Err(error) => self.errors.push(format!("{error}")),
+        'evaluation: {
+            let statements = match parse(&self.code) {
+                Ok(statements) => statements,
+                Err(error) => {
+                    self.errors.push(format!("{error}"));
+                    break 'evaluation;
+                }
+            };
+
+            for statement in statements {
+                fn evaluate_value(
+                    expression: &AstExpression,
+                    variables: &HashMap<String, Multivector>,
+                ) -> Result<Multivector, String> {
+                    Ok(match expression.kind {
+                        AstExpressionKind::Name {
+                            name,
+                            ref name_token,
+                        } => match variables.get(name) {
+                            Some(value) => *value,
+                            None => {
+                                return Err(format!(
+                                    "{}: Unknown variable '{name}'",
+                                    name_token.location
+                                ));
+                            }
+                        },
+                        AstExpressionKind::Number {
+                            number,
+                            number_token: _,
+                        } => Multivector {
+                            s: number,
+                            ..Multivector::ZERO
+                        },
+                        AstExpressionKind::Binary {
+                            ref left,
+                            ref operator,
+                            ref operator_token,
+                            ref right,
+                        } => {
+                            let left = evaluate_value(left, variables)?;
+                            let right = evaluate_value(right, variables)?;
+                            match operator {
+                                BinaryOperator::Add => left + right,
+                                BinaryOperator::Subtract => left - right,
+                                BinaryOperator::Multiply => left * right,
+                                BinaryOperator::Divide => {
+                                    return Err(format!(
+                                        "{}: Divide unimplemented",
+                                        operator_token.location
+                                    ));
+                                }
+                            }
+                        }
+                    })
+                }
+
+                match statement.kind {
+                    AstStatementKind::Assignment {
+                        name,
+                        name_token: _,
+                        equals_token: _,
+                        value,
+                    } => {
+                        let value = match evaluate_value(&value, &self.variables) {
+                            Ok(value) => value,
+                            Err(error) => {
+                                self.errors.push(error);
+                                break 'evaluation;
+                            }
+                        };
+                        self.variables.insert(name.into(), value);
+                    }
                 }
             }
         }
