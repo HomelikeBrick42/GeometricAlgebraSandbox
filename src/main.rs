@@ -133,20 +133,10 @@ impl App {
                 Parameter {
                     name: "e12".into(),
                     type_: ParameterType::Grade2,
-                    // value: Multivector {
-                    //     e12: 1.0,
-                    //     ..Multivector::ZERO
-                    // },
                     value: Multivector {
-                        e0: 1.0,
-                        e1: 1.0,
+                        e12: 1.0,
                         ..Multivector::ZERO
-                    }
-                    .wedge(Multivector {
-                        e0: 1.0,
-                        e2: 1.0,
-                        ..Multivector::ZERO
-                    }),
+                    },
                 },
                 Parameter {
                     name: "e012".into(),
