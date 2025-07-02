@@ -305,6 +305,7 @@ impl eframe::App for App {
                                 if egui::ComboBox::from_id_salt("type")
                                     .selected_text(parameter.type_.display_name())
                                     .show_ui(ui, |ui| {
+                                        let mut changed = false;
                                         for type_ in [
                                             ParameterType::Grade0,
                                             ParameterType::Grade1,
@@ -312,15 +313,18 @@ impl eframe::App for App {
                                             ParameterType::Grade3,
                                             ParameterType::Multivector,
                                         ] {
-                                            ui.selectable_value(
-                                                &mut parameter.type_,
-                                                type_,
-                                                type_.display_name(),
-                                            );
+                                            changed |= ui
+                                                .selectable_value(
+                                                    &mut parameter.type_,
+                                                    type_,
+                                                    type_.display_name(),
+                                                )
+                                                .changed();
                                         }
+                                        changed
                                     })
-                                    .response
-                                    .changed()
+                                    .inner
+                                    .unwrap_or(false)
                                 {
                                     parameter.value = match parameter.type_ {
                                         ParameterType::Grade0 => parameter.value.grade0(),
@@ -377,6 +381,8 @@ impl eframe::App for App {
                         .min_size(ui.available_size()),
                 );
             });
+
+        self.update_code();
 
         egui::Window::new("Values To Display")
             .open(&mut self.values_to_display_window_open)
@@ -439,8 +445,6 @@ impl eframe::App for App {
                     !delete
                 });
             });
-
-        self.update_code();
 
         if !ctx.wants_keyboard_input() {
             ctx.input(|i| {
