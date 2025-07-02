@@ -1,6 +1,7 @@
-use std::ops::{Add, Div, Mul, Sub};
+use derive_more::{Add, AddAssign, Sub, SubAssign};
+use std::ops::{Div, Mul};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Add, AddAssign, Sub, SubAssign)]
 pub struct Multivector {
     pub s: f32,
     pub e0: f32,
@@ -70,7 +71,7 @@ impl Multivector {
         let mut result = Self::ZERO;
         for j in 0..=3 {
             for k in 0..=3 {
-                result = result + (self.grade(j) * other.grade(k)).grade(j + k);
+                result += (self.grade(j) * other.grade(k)).grade(j + k);
             }
         }
         result
@@ -80,7 +81,7 @@ impl Multivector {
         let mut result = Self::ZERO;
         for j in 0..=3 {
             for k in 0..=3 {
-                result = result + (self.grade(j) * other.grade(k)).grade(j.abs_diff(k));
+                result += (self.grade(j) * other.grade(k)).grade(j.abs_diff(k));
             }
         }
         result
@@ -173,80 +174,6 @@ impl Multivector {
             self / magnitude
         } else {
             self
-        }
-    }
-}
-
-impl Add<Multivector> for Multivector {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        let Self {
-            s: a_s,
-            e0: a_e0,
-            e1: a_e1,
-            e2: a_e2,
-            e01: a_e01,
-            e02: a_e02,
-            e12: a_e12,
-            e012: a_e012,
-        } = self;
-        let Self {
-            s: b_s,
-            e0: b_e0,
-            e1: b_e1,
-            e2: b_e2,
-            e01: b_e01,
-            e02: b_e02,
-            e12: b_e12,
-            e012: b_e012,
-        } = other;
-        Self {
-            s: a_s + b_s,
-            e0: a_e0 + b_e0,
-            e1: a_e1 + b_e1,
-            e2: a_e2 + b_e2,
-            e01: a_e01 + b_e01,
-            e02: a_e02 + b_e02,
-            e12: a_e12 + b_e12,
-            e012: a_e012 + b_e012,
-        }
-    }
-}
-
-impl Sub<Multivector> for Multivector {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self::Output {
-        let Self {
-            s: a_s,
-            e0: a_e0,
-            e1: a_e1,
-            e2: a_e2,
-            e01: a_e01,
-            e02: a_e02,
-            e12: a_e12,
-            e012: a_e012,
-        } = self;
-        let Self {
-            s: b_s,
-            e0: b_e0,
-            e1: b_e1,
-            e2: b_e2,
-            e01: b_e01,
-            e02: b_e02,
-            e12: b_e12,
-            e012: b_e012,
-        } = other;
-        Self {
-            s: a_s - b_s,
-            e0: a_e0 - b_e0,
-            e1: a_e1 - b_e1,
-            e2: a_e2 - b_e2,
-            e01: a_e01 - b_e01,
-            e02: a_e02 - b_e02,
-            e12: a_e12 - b_e12,
-            e012: a_e012 - b_e012,
         }
     }
 }

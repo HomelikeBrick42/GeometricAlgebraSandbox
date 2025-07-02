@@ -5,5 +5,7 @@ edition = "2024"
 
 [dependencies]
 cgmath = "0.18.0"
+derive_more = { version = "2.0.1", features = ["full"] }
 eframe = { version = "0.31.1", features = ["persistence", "ron", "serde", "wgpu"] }
 encase = { version = "0.11.1", features = ["cgmath"] }
+thiserror = "2.0.12"

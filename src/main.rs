@@ -1,10 +1,12 @@
 use crate::{
+    lexer::Lexer,
     multivector::Multivector,
     rendering::{GpuCamera, GpuCircle, GpuQuad, RenderData, RenderState},
 };
 use eframe::{egui, wgpu};
 use std::collections::HashMap;
 
+pub mod lexer;
 pub mod multivector;
 pub mod rendering;
 
@@ -195,7 +197,16 @@ impl App {
         }
 
         self.errors.clear();
-        self.errors.push("Test Error".into());
+        {
+            let mut lexer = Lexer::new(&self.code);
+            loop {
+                match lexer.next_token() {
+                    Ok(None) => break,
+                    Ok(Some(token)) => self.errors.push(format!("{}: {token}", token.location)),
+                    Err(error) => self.errors.push(format!("{error}")),
+                }
+            }
+        }
 
         for values_to_display in &mut self.values_to_display {
             values_to_display.display_value = self
@@ -377,6 +388,7 @@ impl eframe::App for App {
                 }
                 ui.add(
                     egui::TextEdit::multiline(&mut self.code)
+                        .id_salt("code")
                         .code_editor()
                         .min_size(ui.available_size()),
                 );
