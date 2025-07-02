@@ -133,10 +133,20 @@ impl App {
                 Parameter {
                     name: "e12".into(),
                     type_: ParameterType::Grade2,
+                    // value: Multivector {
+                    //     e12: 1.0,
+                    //     ..Multivector::ZERO
+                    // },
                     value: Multivector {
-                        e12: 1.0,
+                        e0: 1.0,
+                        e1: 1.0,
                         ..Multivector::ZERO
-                    },
+                    }
+                    .wedge(Multivector {
+                        e0: 1.0,
+                        e2: 1.0,
+                        ..Multivector::ZERO
+                    }),
                 },
                 Parameter {
                     name: "e012".into(),
@@ -522,11 +532,11 @@ impl eframe::App for App {
                     if line.sqr_magnitude() > 0.0001 {
                         quads.push(GpuQuad {
                             position: cgmath::Vector3 {
-                                x: line.e2 * -line.e0,
-                                y: line.e1 * -line.e0,
+                                x: line.e1 * -line.e0,
+                                y: line.e2 * -line.e0,
                                 z: value_to_display.layer,
                             },
-                            rotation: f32::atan2(line.e2, -line.e1),
+                            rotation: f32::atan2(line.e1, line.e2),
                             color: value_to_display.color,
                             size: cgmath::Vector2 {
                                 x: 10000.0,
