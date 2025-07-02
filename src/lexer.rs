@@ -45,6 +45,11 @@ pub enum TokenKind<'source> {
     Minus,
     Asterisk,
     Slash,
+    Caret,
+    Pipe,
+    Ampersand,
+    ExclamationMark,
+    Tilde,
     Equal,
 }
 
@@ -105,6 +110,11 @@ impl<'source> Lexer<'source> {
                     Some('-') => TokenKind::Minus,
                     Some('*') => TokenKind::Asterisk,
                     Some('/') => TokenKind::Slash,
+                    Some('^') => TokenKind::Caret,
+                    Some('|') => TokenKind::Pipe,
+                    Some('&') => TokenKind::Ampersand,
+                    Some('!') => TokenKind::ExclamationMark,
+                    Some('~') => TokenKind::Tilde,
                     Some('=') => TokenKind::Equal,
 
                     Some(c) if c.is_alphabetic() || c == '_' => {

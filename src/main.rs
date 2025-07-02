@@ -232,6 +232,18 @@ impl App {
                             s: number,
                             ..Multivector::ZERO
                         },
+                        AstExpressionKind::Unary {
+                            ref operator,
+                            operator_token: _,
+                            ref operand,
+                        } => {
+                            let operand = evaluate_value(operand, variables)?;
+                            match operator {
+                                parsing::UnaryOperator::Negate => -operand,
+                                parsing::UnaryOperator::Dual => operand.dual(),
+                                parsing::UnaryOperator::Reverse => operand.reverse(),
+                            }
+                        }
                         AstExpressionKind::Binary {
                             ref left,
                             ref operator,
@@ -250,6 +262,9 @@ impl App {
                                         operator_token.location
                                     ));
                                 }
+                                BinaryOperator::Wedge => left.wedge(right),
+                                BinaryOperator::Inner => left.inner(right),
+                                BinaryOperator::Regressive => left.regressive(right),
                             }
                         }
                     })
@@ -368,6 +383,7 @@ impl eframe::App for App {
                         type_: ParameterType::Grade0,
                         value: Multivector::ZERO,
                     });
+                    code_or_parameters_changed = true;
                 }
                 let mut i = 0usize;
                 let mut delete = false;
@@ -377,7 +393,8 @@ impl eframe::App for App {
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.label("Name:");
-                                ui.text_edit_singleline(&mut parameter.name);
+                                code_or_parameters_changed |=
+                                    ui.text_edit_singleline(&mut parameter.name).changed();
                             });
 
                             ui.horizontal(|ui| {
@@ -468,10 +485,6 @@ impl eframe::App for App {
                     .changed();
             });
 
-        if code_or_parameters_changed {
-            self.update_code();
-        }
-
         egui::Window::new("Values To Display")
             .open(&mut self.values_to_display_window_open)
             .scroll([false, true])
@@ -487,6 +500,7 @@ impl eframe::App for App {
                         layer: 0.0,
                         display_value: Multivector::ZERO,
                     });
+                    code_or_parameters_changed |= true;
                 }
                 let mut i = 0usize;
                 let mut delete = false;
@@ -502,7 +516,9 @@ impl eframe::App for App {
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label("Name:");
-                            ui.text_edit_singleline(&mut value_to_display.name);
+                            code_or_parameters_changed |= ui
+                                .text_edit_singleline(&mut value_to_display.name)
+                                .changed();
                         });
 
                         ui.horizontal(|ui| {
@@ -527,12 +543,17 @@ impl eframe::App for App {
                         });
 
                         delete = ui.button("Delete").clicked();
+                        code_or_parameters_changed |= delete;
                     });
 
                     i += 1;
                     !delete
                 });
             });
+
+        if code_or_parameters_changed {
+            self.update_code();
+        }
 
         if !ctx.wants_keyboard_input() {
             ctx.input(|i| {

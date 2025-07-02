@@ -61,6 +61,11 @@ pub enum AstExpressionKind<'source> {
         number: f32,
         number_token: Token<'source>,
     },
+    Unary {
+        operator: UnaryOperator,
+        operator_token: Token<'source>,
+        operand: Box<AstExpression<'source>>,
+    },
     Binary {
         left: Box<AstExpression<'source>>,
         operator: BinaryOperator,
@@ -70,11 +75,21 @@ pub enum AstExpressionKind<'source> {
 }
 
 #[derive(Debug)]
+pub enum UnaryOperator {
+    Negate,
+    Dual,
+    Reverse,
+}
+
+#[derive(Debug)]
 pub enum BinaryOperator {
     Add,
     Subtract,
     Multiply,
     Divide,
+    Wedge,
+    Inner,
+    Regressive,
 }
 
 pub fn parse(source: &str) -> Result<Vec<AstStatement<'_>>, ParseError<'_>> {
@@ -143,13 +158,36 @@ impl<'source> Parser<'source> {
         &mut self,
         parent_precedence: usize,
     ) -> Result<AstExpression<'source>, ParseError<'source>> {
-        let mut left = self.parse_primary_expression()?;
+        let unary_operator = match self.lexer.peek_token()?.map(|token| token.kind) {
+            Some(TokenKind::Minus) => Some(UnaryOperator::Negate),
+            Some(TokenKind::ExclamationMark) => Some(UnaryOperator::Dual),
+            Some(TokenKind::Tilde) => Some(UnaryOperator::Reverse),
+            _ => None,
+        };
+        let mut left = if let Some(operator) = unary_operator {
+            let operator_token = expect_token!(self, _)?;
+            let operand = self.parse_binary_expression(usize::MAX)?;
+            AstExpression {
+                location: operator_token.location,
+                kind: AstExpressionKind::Unary {
+                    operator,
+                    operator_token,
+                    operand: Box::new(operand),
+                },
+            }
+        } else {
+            self.parse_primary_expression()?
+        };
+
         loop {
             let (precedence, operator) = match self.lexer.peek_token()?.map(|token| token.kind) {
                 Some(TokenKind::Plus) => (1, BinaryOperator::Add),
                 Some(TokenKind::Minus) => (1, BinaryOperator::Subtract),
                 Some(TokenKind::Asterisk) => (2, BinaryOperator::Multiply),
                 Some(TokenKind::Slash) => (2, BinaryOperator::Divide),
+                Some(TokenKind::Caret) => (2, BinaryOperator::Wedge),
+                Some(TokenKind::Pipe) => (2, BinaryOperator::Inner),
+                Some(TokenKind::Ampersand) => (2, BinaryOperator::Regressive),
                 _ => break,
             };
 
