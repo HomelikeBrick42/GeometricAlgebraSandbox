@@ -1,6 +1,6 @@
 use crate::{
     multivector::Multivector,
-    rendering::{GpuCamera, GpuQuad, RenderData, RenderState},
+    rendering::{GpuCamera, GpuCircle, GpuQuad, RenderData, RenderState},
 };
 use eframe::{egui, wgpu};
 use std::collections::HashMap;
@@ -30,6 +30,8 @@ struct Camera {
     zoom_speed: f32,
     show_grid: bool,
     grid_thickness: f32,
+    line_thickness: f32,
+    point_radius: f32,
 }
 
 struct Parameter {
@@ -83,6 +85,8 @@ impl App {
                 zoom_speed: 2.0,
                 show_grid: true,
                 grid_thickness: 0.05,
+                line_thickness: 0.1,
+                point_radius: 0.1,
             },
             parameters_window_open: true,
             parameters: vec![
@@ -164,6 +168,16 @@ impl App {
                         x: 0.0,
                         y: 1.0,
                         z: 0.0,
+                    },
+                    layer: 0.0,
+                    display_value: Multivector::ZERO,
+                },
+                ValueToDisplay {
+                    name: "e12".into(),
+                    color: cgmath::Vector3 {
+                        x: 1.0,
+                        y: 1.0,
+                        z: 1.0,
                     },
                     layer: 0.0,
                     display_value: Multivector::ZERO,
@@ -253,6 +267,14 @@ impl eframe::App for App {
                 ui.horizontal(|ui| {
                     ui.label("Grid Thickness:");
                     ui.add(egui::DragValue::new(&mut self.camera.grid_thickness).speed(0.01));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Line Thickness:");
+                    ui.add(egui::DragValue::new(&mut self.camera.line_thickness).speed(0.01));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Point Radius:");
+                    ui.add(egui::DragValue::new(&mut self.camera.point_radius).speed(0.01));
                 });
             });
 
@@ -446,7 +468,7 @@ impl eframe::App for App {
                 let aspect = rect.width() / rect.height();
 
                 let mut quads = vec![];
-                let circles = vec![];
+                let mut circles = vec![];
 
                 if self.camera.show_grid {
                     let view_width = self.camera.view_height * aspect;
@@ -491,6 +513,38 @@ impl eframe::App for App {
                                 x: view_width,
                                 y: self.camera.grid_thickness,
                             },
+                        });
+                    }
+                }
+
+                for value_to_display in &self.values_to_display {
+                    let line = value_to_display.display_value.grade1().normalised();
+                    if line.sqr_magnitude() > 0.0001 {
+                        quads.push(GpuQuad {
+                            position: cgmath::Vector3 {
+                                x: line.e2 * -line.e0,
+                                y: line.e1 * -line.e0,
+                                z: value_to_display.layer,
+                            },
+                            rotation: f32::atan2(line.e2, -line.e1),
+                            color: value_to_display.color,
+                            size: cgmath::Vector2 {
+                                x: 10000.0,
+                                y: self.camera.line_thickness,
+                            },
+                        });
+                    }
+
+                    let point = value_to_display.display_value.grade2().normalised();
+                    if point.sqr_magnitude() > 0.0001 {
+                        circles.push(GpuCircle {
+                            position: cgmath::Vector3 {
+                                x: -point.e02,
+                                y: point.e01,
+                                z: value_to_display.layer,
+                            },
+                            color: value_to_display.color,
+                            radius: self.camera.point_radius,
                         });
                     }
                 }
