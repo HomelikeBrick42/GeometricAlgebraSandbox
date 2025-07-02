@@ -3,6 +3,7 @@ use crate::{
     rendering::{GpuCamera, GpuQuad, RenderData, RenderState},
 };
 use eframe::{egui, wgpu};
+use std::collections::HashMap;
 
 pub mod multivector;
 pub mod rendering;
@@ -14,6 +15,12 @@ struct App {
     camera: Camera,
     parameters_window_open: bool,
     parameters: Vec<Parameter>,
+    code_window_open: bool,
+    errors: Vec<String>,
+    code: String,
+    values_to_display_window_open: bool,
+    values_to_display: Vec<ValueToDisplay>,
+    variables: HashMap<String, Multivector>,
 }
 
 struct Camera {
@@ -28,7 +35,6 @@ struct Camera {
 struct Parameter {
     name: String,
     type_: ParameterType,
-    color: cgmath::Vector3<f32>,
     value: Multivector,
 }
 
@@ -53,6 +59,13 @@ impl ParameterType {
     }
 }
 
+struct ValueToDisplay {
+    name: String,
+    color: cgmath::Vector3<f32>,
+    layer: f32,
+    display_value: Multivector,
+}
+
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let renderer = cc.wgpu_render_state.as_ref().unwrap();
@@ -72,7 +85,110 @@ impl App {
                 grid_thickness: 0.05,
             },
             parameters_window_open: true,
-            parameters: vec![],
+            parameters: vec![
+                Parameter {
+                    name: "e0".into(),
+                    type_: ParameterType::Grade1,
+                    value: Multivector {
+                        e0: 1.0,
+                        ..Multivector::ZERO
+                    },
+                },
+                Parameter {
+                    name: "e1".into(),
+                    type_: ParameterType::Grade1,
+                    value: Multivector {
+                        e1: 1.0,
+                        ..Multivector::ZERO
+                    },
+                },
+                Parameter {
+                    name: "e2".into(),
+                    type_: ParameterType::Grade1,
+                    value: Multivector {
+                        e2: 1.0,
+                        ..Multivector::ZERO
+                    },
+                },
+                Parameter {
+                    name: "e01".into(),
+                    type_: ParameterType::Grade2,
+                    value: Multivector {
+                        e01: 1.0,
+                        ..Multivector::ZERO
+                    },
+                },
+                Parameter {
+                    name: "e02".into(),
+                    type_: ParameterType::Grade2,
+                    value: Multivector {
+                        e02: 1.0,
+                        ..Multivector::ZERO
+                    },
+                },
+                Parameter {
+                    name: "e12".into(),
+                    type_: ParameterType::Grade2,
+                    value: Multivector {
+                        e12: 1.0,
+                        ..Multivector::ZERO
+                    },
+                },
+                Parameter {
+                    name: "e012".into(),
+                    type_: ParameterType::Grade3,
+                    value: Multivector {
+                        e012: 1.0,
+                        ..Multivector::ZERO
+                    },
+                },
+            ],
+            code_window_open: true,
+            errors: vec![],
+            code: String::new(),
+            values_to_display_window_open: true,
+            values_to_display: vec![
+                ValueToDisplay {
+                    name: "e1".into(),
+                    color: cgmath::Vector3 {
+                        x: 1.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                    layer: 0.0,
+                    display_value: Multivector::ZERO,
+                },
+                ValueToDisplay {
+                    name: "e2".into(),
+                    color: cgmath::Vector3 {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    layer: 0.0,
+                    display_value: Multivector::ZERO,
+                },
+            ],
+            variables: HashMap::new(),
+        }
+    }
+
+    fn update_code(&mut self) {
+        self.variables.clear();
+        for parameter in &self.parameters {
+            self.variables
+                .insert(parameter.name.clone(), parameter.value);
+        }
+
+        self.errors.clear();
+        self.errors.push("Test Error".into());
+
+        for values_to_display in &mut self.values_to_display {
+            values_to_display.display_value = self
+                .variables
+                .get(&values_to_display.name)
+                .copied()
+                .unwrap_or(Multivector::ZERO);
         }
     }
 }
@@ -83,14 +199,13 @@ impl eframe::App for App {
         let dt = (time - self.last_time.unwrap_or(time)).as_secs_f32();
         self.last_time = Some(time);
 
-        let mut quads = vec![];
-        let circles = vec![];
-
         egui::TopBottomPanel::top("Menu").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 self.info_window_open |= ui.button("Info").clicked();
                 self.camera_window_open |= ui.button("Camera").clicked();
                 self.parameters_window_open |= ui.button("Parameters").clicked();
+                self.code_window_open |= ui.button("Code").clicked();
+                self.values_to_display_window_open |= ui.button("Values To Display").clicked();
             });
         });
 
@@ -147,13 +262,8 @@ impl eframe::App for App {
             .show(ctx, |ui| {
                 if ui.button("New Parameter").clicked() {
                     self.parameters.push(Parameter {
-                        name: "Unnamed Parameter".into(),
+                        name: "unnamed".into(),
                         type_: ParameterType::Grade0,
-                        color: cgmath::Vector3 {
-                            x: 1.0,
-                            y: 0.0,
-                            z: 0.0,
-                        },
                         value: Multivector::ZERO,
                     });
                 }
@@ -166,11 +276,6 @@ impl eframe::App for App {
                             ui.horizontal(|ui| {
                                 ui.label("Name:");
                                 ui.text_edit_singleline(&mut parameter.name);
-                            });
-
-                            ui.horizontal(|ui| {
-                                ui.label("Color:");
-                                ui.color_edit_button_rgb(parameter.color.as_mut());
                             });
 
                             ui.horizontal(|ui| {
@@ -213,60 +318,14 @@ impl eframe::App for App {
                                 ParameterType::Multivector => (true, true, true, true),
                             };
 
-                            if grade0 {
-                                ui.horizontal(|ui| {
-                                    ui.label("Scalar:");
-                                    ui.add(egui::DragValue::new(&mut parameter.value.s).speed(0.1));
-                                });
-                            }
-                            if grade1 {
-                                ui.horizontal(|ui| {
-                                    ui.label("e0:");
-                                    ui.add(
-                                        egui::DragValue::new(&mut parameter.value.e0).speed(0.1),
-                                    );
-                                });
-                                ui.horizontal(|ui| {
-                                    ui.label("e1:");
-                                    ui.add(
-                                        egui::DragValue::new(&mut parameter.value.e1).speed(0.1),
-                                    );
-                                });
-                                ui.horizontal(|ui| {
-                                    ui.label("e2:");
-                                    ui.add(
-                                        egui::DragValue::new(&mut parameter.value.e2).speed(0.1),
-                                    );
-                                });
-                            }
-                            if grade2 {
-                                ui.horizontal(|ui| {
-                                    ui.label("e01:");
-                                    ui.add(
-                                        egui::DragValue::new(&mut parameter.value.e01).speed(0.1),
-                                    );
-                                });
-                                ui.horizontal(|ui| {
-                                    ui.label("e02:");
-                                    ui.add(
-                                        egui::DragValue::new(&mut parameter.value.e02).speed(0.1),
-                                    );
-                                });
-                                ui.horizontal(|ui| {
-                                    ui.label("e12:");
-                                    ui.add(
-                                        egui::DragValue::new(&mut parameter.value.e12).speed(0.1),
-                                    );
-                                });
-                            }
-                            if grade3 {
-                                ui.horizontal(|ui| {
-                                    ui.label("e012:");
-                                    ui.add(
-                                        egui::DragValue::new(&mut parameter.value.e012).speed(0.1),
-                                    );
-                                });
-                            }
+                            edit_multivector(
+                                ui,
+                                &mut parameter.value,
+                                grade0,
+                                grade1,
+                                grade2,
+                                grade3,
+                            );
 
                             delete = ui.button("Delete").clicked();
                         });
@@ -275,6 +334,87 @@ impl eframe::App for App {
                     !delete
                 });
             });
+
+        egui::Window::new("Code")
+            .open(&mut self.code_window_open)
+            .scroll(true)
+            .show(ctx, |ui| {
+                if !self.errors.is_empty() {
+                    ui.heading("Errors:");
+                    for error in &self.errors {
+                        ui.label(egui::RichText::new(error).color(egui::Color32::RED));
+                    }
+                }
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.code)
+                        .code_editor()
+                        .min_size(ui.available_size()),
+                );
+            });
+
+        egui::Window::new("Values To Display")
+            .open(&mut self.values_to_display_window_open)
+            .scroll([false, true])
+            .show(ctx, |ui| {
+                if ui.button("New Value To Display").clicked() {
+                    self.values_to_display.push(ValueToDisplay {
+                        name: "unassigned".into(),
+                        color: cgmath::Vector3 {
+                            x: 1.0,
+                            y: 0.0,
+                            z: 0.0,
+                        },
+                        layer: 0.0,
+                        display_value: Multivector::ZERO,
+                    });
+                }
+                let mut i = 0usize;
+                let mut delete = false;
+                self.values_to_display.retain_mut(|value_to_display| {
+                    egui::CollapsingHeader::new(egui::RichText::new(&value_to_display.name).color(
+                        egui::Color32::from_rgb(
+                            (value_to_display.color.x * 255.0) as u8,
+                            (value_to_display.color.y * 255.0) as u8,
+                            (value_to_display.color.z * 255.0) as u8,
+                        ),
+                    ))
+                    .id_salt(i)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Name:");
+                            ui.text_edit_singleline(&mut value_to_display.name);
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label("Color:");
+                            ui.color_edit_button_rgb(value_to_display.color.as_mut());
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label("Layer");
+                            ui.add(egui::Slider::new(&mut value_to_display.layer, 0.0..=1.0));
+                        });
+
+                        ui.add_enabled_ui(false, |ui| {
+                            edit_multivector(
+                                ui,
+                                &mut value_to_display.display_value,
+                                true,
+                                true,
+                                true,
+                                true,
+                            );
+                        });
+
+                        delete = ui.button("Delete").clicked();
+                    });
+
+                    i += 1;
+                    !delete
+                });
+            });
+
+        self.update_code();
 
         if !ctx.wants_keyboard_input() {
             ctx.input(|i| {
@@ -301,6 +441,9 @@ impl eframe::App for App {
                     ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
                 let aspect = rect.width() / rect.height();
 
+                let mut quads = vec![];
+                let circles = vec![];
+
                 if self.camera.show_grid {
                     let view_width = self.camera.view_height * aspect;
                     for i in 0..view_width.ceil() as usize + 2 {
@@ -310,21 +453,13 @@ impl eframe::App for App {
                             position: cgmath::Vector3 {
                                 x: position,
                                 y: self.camera.position.y,
-                                z: if position == 0.0 { 0.1 } else { 0.0 },
+                                z: 0.0,
                             },
                             rotation: 0.0,
-                            color: if position == 0.0 {
-                                cgmath::Vector3 {
-                                    x: 1.0,
-                                    y: 1.0,
-                                    z: 1.0,
-                                }
-                            } else {
-                                cgmath::Vector3 {
-                                    x: 0.5,
-                                    y: 0.5,
-                                    z: 0.5,
-                                }
+                            color: cgmath::Vector3 {
+                                x: 0.5,
+                                y: 0.5,
+                                z: 0.5,
                             },
                             size: cgmath::Vector2 {
                                 x: self.camera.grid_thickness,
@@ -340,21 +475,13 @@ impl eframe::App for App {
                             position: cgmath::Vector3 {
                                 x: self.camera.position.x,
                                 y: position,
-                                z: if position == 0.0 { 0.1 } else { 0.0 },
+                                z: 0.0,
                             },
                             rotation: 0.0,
-                            color: if position == 0.0 {
-                                cgmath::Vector3 {
-                                    x: 1.0,
-                                    y: 1.0,
-                                    z: 1.0,
-                                }
-                            } else {
-                                cgmath::Vector3 {
-                                    x: 0.5,
-                                    y: 0.5,
-                                    z: 0.5,
-                                }
+                            color: cgmath::Vector3 {
+                                x: 0.5,
+                                y: 0.5,
+                                z: 0.5,
                             },
                             size: cgmath::Vector2 {
                                 x: view_width,
@@ -381,6 +508,56 @@ impl eframe::App for App {
             });
 
         ctx.request_repaint();
+    }
+}
+
+fn edit_multivector(
+    ui: &mut egui::Ui,
+    value: &mut Multivector,
+    grade0: bool,
+    grade1: bool,
+    grade2: bool,
+    grade3: bool,
+) {
+    if grade0 {
+        ui.horizontal(|ui| {
+            ui.label("Scalar:");
+            ui.add(egui::DragValue::new(&mut value.s).speed(0.1));
+        });
+    }
+    if grade1 {
+        ui.horizontal(|ui| {
+            ui.label("e0:");
+            ui.add(egui::DragValue::new(&mut value.e0).speed(0.1));
+        });
+        ui.horizontal(|ui| {
+            ui.label("e1:");
+            ui.add(egui::DragValue::new(&mut value.e1).speed(0.1));
+        });
+        ui.horizontal(|ui| {
+            ui.label("e2:");
+            ui.add(egui::DragValue::new(&mut value.e2).speed(0.1));
+        });
+    }
+    if grade2 {
+        ui.horizontal(|ui| {
+            ui.label("e01:");
+            ui.add(egui::DragValue::new(&mut value.e01).speed(0.1));
+        });
+        ui.horizontal(|ui| {
+            ui.label("e02:");
+            ui.add(egui::DragValue::new(&mut value.e02).speed(0.1));
+        });
+        ui.horizontal(|ui| {
+            ui.label("e12:");
+            ui.add(egui::DragValue::new(&mut value.e12).speed(0.1));
+        });
+    }
+    if grade3 {
+        ui.horizontal(|ui| {
+            ui.label("e012:");
+            ui.add(egui::DragValue::new(&mut value.e012).speed(0.1));
+        });
     }
 }
 
