@@ -315,7 +315,7 @@ impl eframe::App for App {
 
         egui::Window::new("Parameters")
             .open(&mut self.parameters_window_open)
-            .scroll([false, true])
+            .resizable(true)
             .show(ctx, |ui| {
                 if ui.button("New Parameter").clicked() {
                     self.parameters.push(Parameter {
@@ -325,82 +325,85 @@ impl eframe::App for App {
                     });
                     code_or_parameters_changed = true;
                 }
-                let mut i = 0usize;
-                let mut delete = false;
-                self.parameters.retain_mut(|parameter| {
-                    egui::CollapsingHeader::new(&parameter.name)
-                        .id_salt(i)
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label("Name:");
-                                code_or_parameters_changed |=
-                                    ui.text_edit_singleline(&mut parameter.name).changed();
-                            });
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    let mut i = 0usize;
+                    let mut delete = false;
+                    self.parameters.retain_mut(|parameter| {
+                        egui::CollapsingHeader::new(&parameter.name)
+                            .id_salt(i)
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label("Name:");
+                                    code_or_parameters_changed |=
+                                        ui.text_edit_singleline(&mut parameter.name).changed();
+                                });
 
-                            ui.horizontal(|ui| {
-                                ui.label("Type:");
-                                if egui::ComboBox::from_id_salt("type")
-                                    .selected_text(parameter.type_.display_name())
-                                    .show_ui(ui, |ui| {
-                                        let mut changed = false;
-                                        for type_ in [
-                                            ParameterType::Grade0,
-                                            ParameterType::Grade1,
-                                            ParameterType::Grade2,
-                                            ParameterType::Grade3,
-                                            ParameterType::Multivector,
-                                        ] {
-                                            changed |= ui
-                                                .selectable_value(
-                                                    &mut parameter.type_,
-                                                    type_,
-                                                    type_.display_name(),
-                                                )
-                                                .changed();
-                                        }
-                                        changed
-                                    })
-                                    .inner
-                                    .unwrap_or(false)
-                                {
-                                    parameter.value = match parameter.type_ {
-                                        ParameterType::Grade0 => parameter.value.grade0(),
-                                        ParameterType::Grade1 => parameter.value.grade1(),
-                                        ParameterType::Grade2 => parameter.value.grade2(),
-                                        ParameterType::Grade3 => parameter.value.grade3(),
-                                        ParameterType::Multivector => parameter.value,
-                                    };
-                                    code_or_parameters_changed = true;
+                                ui.horizontal(|ui| {
+                                    ui.label("Type:");
+                                    if egui::ComboBox::from_id_salt("type")
+                                        .selected_text(parameter.type_.display_name())
+                                        .show_ui(ui, |ui| {
+                                            let mut changed = false;
+                                            for type_ in [
+                                                ParameterType::Grade0,
+                                                ParameterType::Grade1,
+                                                ParameterType::Grade2,
+                                                ParameterType::Grade3,
+                                                ParameterType::Multivector,
+                                            ] {
+                                                changed |= ui
+                                                    .selectable_value(
+                                                        &mut parameter.type_,
+                                                        type_,
+                                                        type_.display_name(),
+                                                    )
+                                                    .changed();
+                                            }
+                                            changed
+                                        })
+                                        .inner
+                                        .unwrap_or(false)
+                                    {
+                                        parameter.value = match parameter.type_ {
+                                            ParameterType::Grade0 => parameter.value.grade0(),
+                                            ParameterType::Grade1 => parameter.value.grade1(),
+                                            ParameterType::Grade2 => parameter.value.grade2(),
+                                            ParameterType::Grade3 => parameter.value.grade3(),
+                                            ParameterType::Multivector => parameter.value,
+                                        };
+                                        code_or_parameters_changed = true;
+                                    }
+                                });
+
+                                if ui.button("Normalise").clicked() {
+                                    parameter.value = parameter.value.normalised();
                                 }
+
+                                let (grade0, grade1, grade2, grade3) = match parameter.type_ {
+                                    ParameterType::Grade0 => (true, false, false, false),
+                                    ParameterType::Grade1 => (false, true, false, false),
+                                    ParameterType::Grade2 => (false, false, true, false),
+                                    ParameterType::Grade3 => (false, false, false, true),
+                                    ParameterType::Multivector => (true, true, true, true),
+                                };
+
+                                code_or_parameters_changed |= edit_multivector(
+                                    ui,
+                                    &mut parameter.value,
+                                    grade0,
+                                    grade1,
+                                    grade2,
+                                    grade3,
+                                );
+
+                                delete = ui.button("Delete").clicked();
+                                code_or_parameters_changed |= delete;
                             });
 
-                            if ui.button("Normalise").clicked() {
-                                parameter.value = parameter.value.normalised();
-                            }
-
-                            let (grade0, grade1, grade2, grade3) = match parameter.type_ {
-                                ParameterType::Grade0 => (true, false, false, false),
-                                ParameterType::Grade1 => (false, true, false, false),
-                                ParameterType::Grade2 => (false, false, true, false),
-                                ParameterType::Grade3 => (false, false, false, true),
-                                ParameterType::Multivector => (true, true, true, true),
-                            };
-
-                            code_or_parameters_changed |= edit_multivector(
-                                ui,
-                                &mut parameter.value,
-                                grade0,
-                                grade1,
-                                grade2,
-                                grade3,
-                            );
-
-                            delete = ui.button("Delete").clicked();
-                            code_or_parameters_changed |= delete;
-                        });
-
-                    i += 1;
-                    !delete
+                        i += 1;
+                        !delete
+                    });
+                    ui.allocate_space(ui.available_size());
                 });
             });
 
@@ -427,7 +430,7 @@ impl eframe::App for App {
 
         egui::Window::new("Values To Display")
             .open(&mut self.values_to_display_window_open)
-            .scroll([false, true])
+            .resizable(true)
             .show(ctx, |ui| {
                 if ui.button("New Value To Display").clicked() {
                     self.values_to_display.push(ValueToDisplay {
@@ -442,52 +445,59 @@ impl eframe::App for App {
                     });
                     code_or_parameters_changed |= true;
                 }
-                let mut i = 0usize;
-                let mut delete = false;
-                self.values_to_display.retain_mut(|value_to_display| {
-                    egui::CollapsingHeader::new(egui::RichText::new(&value_to_display.name).color(
-                        egui::Color32::from_rgb(
-                            (value_to_display.color.x * 255.0) as u8,
-                            (value_to_display.color.y * 255.0) as u8,
-                            (value_to_display.color.z * 255.0) as u8,
-                        ),
-                    ))
-                    .id_salt(i)
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Name:");
-                            code_or_parameters_changed |= ui
-                                .text_edit_singleline(&mut value_to_display.name)
-                                .changed();
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    let mut i = 0usize;
+                    let mut delete = false;
+                    self.values_to_display.retain_mut(|value_to_display| {
+                        egui::CollapsingHeader::new(
+                            egui::RichText::new(&value_to_display.name).color(
+                                egui::Color32::from_rgb(
+                                    (value_to_display.color.x * 255.0) as u8,
+                                    (value_to_display.color.y * 255.0) as u8,
+                                    (value_to_display.color.z * 255.0) as u8,
+                                ),
+                            ),
+                        )
+                        .id_salt(i)
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label("Name:");
+                                code_or_parameters_changed |= ui
+                                    .text_edit_singleline(&mut value_to_display.name)
+                                    .changed();
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Color:");
+                                ui.color_edit_button_rgb(value_to_display.color.as_mut());
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Layer");
+                                ui.add(egui::Slider::new(&mut value_to_display.layer, 0.0..=1.0));
+                            });
+
+                            ui.collapsing("Value", |ui| {
+                                ui.add_enabled_ui(false, |ui| {
+                                    edit_multivector(
+                                        ui,
+                                        &mut value_to_display.display_value,
+                                        true,
+                                        true,
+                                        true,
+                                        true,
+                                    );
+                                });
+                            });
+
+                            delete = ui.button("Delete").clicked();
+                            code_or_parameters_changed |= delete;
                         });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Color:");
-                            ui.color_edit_button_rgb(value_to_display.color.as_mut());
-                        });
-
-                        ui.horizontal(|ui| {
-                            ui.label("Layer");
-                            ui.add(egui::Slider::new(&mut value_to_display.layer, 0.0..=1.0));
-                        });
-
-                        ui.add_enabled_ui(false, |ui| {
-                            edit_multivector(
-                                ui,
-                                &mut value_to_display.display_value,
-                                true,
-                                true,
-                                true,
-                                true,
-                            );
-                        });
-
-                        delete = ui.button("Delete").clicked();
-                        code_or_parameters_changed |= delete;
+                        i += 1;
+                        !delete
                     });
-
-                    i += 1;
-                    !delete
+                    ui.allocate_space(ui.available_size());
                 });
             });
 
