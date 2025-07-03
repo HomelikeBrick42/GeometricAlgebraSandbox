@@ -648,12 +648,12 @@ impl eframe::App for App {
                         });
                     }
 
-                    let point = value_to_display.display_value.grade2().normalised();
+                    let point = value_to_display.display_value.grade2();
                     if point.sqr_magnitude() > 0.0001 {
                         circles.push(GpuCircle {
                             position: cgmath::Vector3 {
-                                x: -point.e02 * point.e12,
-                                y: point.e01 * point.e12,
+                                x: -point.e02 / point.e12,
+                                y: point.e01 / point.e12,
                                 z: value_to_display.layer,
                             },
                             color: value_to_display.color,
