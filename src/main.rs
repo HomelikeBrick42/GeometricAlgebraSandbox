@@ -652,8 +652,8 @@ impl eframe::App for App {
                     if point.sqr_magnitude() > 0.0001 {
                         circles.push(GpuCircle {
                             position: cgmath::Vector3 {
-                                x: -point.e02,
-                                y: point.e01,
+                                x: -point.e02 * point.e12,
+                                y: point.e01 * point.e12,
                                 z: value_to_display.layer,
                             },
                             color: value_to_display.color,
