@@ -639,7 +639,7 @@ impl eframe::App for App {
                                 y: line.e2 * -line.e0,
                                 z: value_to_display.layer,
                             },
-                            rotation: f32::atan2(line.e1, line.e2),
+                            rotation: f32::atan2(-line.e1, line.e2),
                             color: value_to_display.color,
                             size: cgmath::Vector2 {
                                 x: 10000.0,
