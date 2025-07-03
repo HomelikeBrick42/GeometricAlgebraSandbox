@@ -36,20 +36,37 @@ pub struct Token<'source> {
 pub enum TokenKind<'source> {
     #[display("{_0}")]
     Name(&'source str),
+    #[display("normalize")]
+    NormalizeKeyword,
+    #[display("magnitude")]
+    MagnitudeKeyword,
     #[display("{_0}")]
     Number(f32),
+    #[display("(")]
     OpenParenthesis,
+    #[display(")")]
     CloseParenthesis,
+    #[display(";")]
     Semicolon,
+    #[display("+")]
     Plus,
+    #[display("-")]
     Minus,
+    #[display("*")]
     Asterisk,
+    #[display("/")]
     Slash,
+    #[display("^")]
     Caret,
+    #[display("|")]
     Pipe,
+    #[display("&")]
     Ampersand,
+    #[display("!")]
     ExclamationMark,
+    #[display("~")]
     Tilde,
+    #[display("=")]
     Equal,
 }
 
@@ -125,8 +142,11 @@ impl<'source> Lexer<'source> {
                         }
 
                         let end_location = self.location;
-                        let name = &self.source[start_location.position..end_location.position];
-                        TokenKind::Name(name)
+                        match &self.source[start_location.position..end_location.position] {
+                            "normalize" => TokenKind::NormalizeKeyword,
+                            "magnitude" => TokenKind::MagnitudeKeyword,
+                            name => TokenKind::Name(name),
+                        }
                     }
 
                     Some(c) if c.is_numeric() => {

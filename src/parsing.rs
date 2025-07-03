@@ -79,6 +79,8 @@ pub enum UnaryOperator {
     Negate,
     Dual,
     Reverse,
+    Normalise,
+    Magnitude,
 }
 
 #[derive(Debug)]
@@ -230,6 +232,40 @@ impl<'source> Parser<'source> {
                     number_token,
                 },
             },
+
+            operator_token @ Token {
+                location,
+                kind: TokenKind::NormalizeKeyword,
+            } => {
+                expect_token!(self, TokenKind::OpenParenthesis)?;
+                let operand = self.parse_expression()?;
+                expect_token!(self, TokenKind::CloseParenthesis)?;
+                AstExpression {
+                    location,
+                    kind: AstExpressionKind::Unary {
+                        operator: UnaryOperator::Normalise,
+                        operator_token,
+                        operand: Box::new(operand),
+                    },
+                }
+            }
+
+            operator_token @ Token {
+                location,
+                kind: TokenKind::MagnitudeKeyword,
+            } => {
+                expect_token!(self, TokenKind::OpenParenthesis)?;
+                let operand = self.parse_expression()?;
+                expect_token!(self, TokenKind::CloseParenthesis)?;
+                AstExpression {
+                    location,
+                    kind: AstExpressionKind::Unary {
+                        operator: UnaryOperator::Magnitude,
+                        operator_token,
+                        operand: Box::new(operand),
+                    },
+                }
+            }
 
             Token {
                 location: _,

@@ -1,11 +1,13 @@
 use crate::{
+    evaluation::evaluate_expression,
     multivector::Multivector,
-    parsing::{AstExpression, AstExpressionKind, AstStatementKind, BinaryOperator, parse},
+    parsing::{AstStatementKind, parse},
     rendering::{GpuCamera, GpuCircle, GpuQuad, RenderData, RenderState},
 };
 use eframe::{egui, wgpu};
 use std::collections::HashMap;
 
+pub mod evaluation;
 pub mod lexer;
 pub mod multivector;
 pub mod parsing;
@@ -208,68 +210,6 @@ impl App {
             };
 
             for statement in statements {
-                fn evaluate_value(
-                    expression: &AstExpression,
-                    variables: &HashMap<String, Multivector>,
-                ) -> Result<Multivector, String> {
-                    Ok(match expression.kind {
-                        AstExpressionKind::Name {
-                            name,
-                            ref name_token,
-                        } => match variables.get(name) {
-                            Some(value) => *value,
-                            None => {
-                                return Err(format!(
-                                    "{}: Unknown variable '{name}'",
-                                    name_token.location
-                                ));
-                            }
-                        },
-                        AstExpressionKind::Number {
-                            number,
-                            number_token: _,
-                        } => Multivector {
-                            s: number,
-                            ..Multivector::ZERO
-                        },
-                        AstExpressionKind::Unary {
-                            ref operator,
-                            operator_token: _,
-                            ref operand,
-                        } => {
-                            let operand = evaluate_value(operand, variables)?;
-                            match operator {
-                                parsing::UnaryOperator::Negate => -operand,
-                                parsing::UnaryOperator::Dual => operand.dual(),
-                                parsing::UnaryOperator::Reverse => operand.reverse(),
-                            }
-                        }
-                        AstExpressionKind::Binary {
-                            ref left,
-                            ref operator,
-                            ref operator_token,
-                            ref right,
-                        } => {
-                            let left = evaluate_value(left, variables)?;
-                            let right = evaluate_value(right, variables)?;
-                            match operator {
-                                BinaryOperator::Add => left + right,
-                                BinaryOperator::Subtract => left - right,
-                                BinaryOperator::Multiply => left * right,
-                                BinaryOperator::Divide => {
-                                    return Err(format!(
-                                        "{}: Divide unimplemented",
-                                        operator_token.location
-                                    ));
-                                }
-                                BinaryOperator::Wedge => left.wedge(right),
-                                BinaryOperator::Inner => left.inner(right),
-                                BinaryOperator::Regressive => left.regressive(right),
-                            }
-                        }
-                    })
-                }
-
                 match statement.kind {
                     AstStatementKind::Assignment {
                         name,
@@ -277,7 +217,7 @@ impl App {
                         equals_token: _,
                         value,
                     } => {
-                        let value = match evaluate_value(&value, &self.variables) {
+                        let value = match evaluate_expression(&value, &self.variables) {
                             Ok(value) => value,
                             Err(error) => {
                                 self.errors.push(error);
