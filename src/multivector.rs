@@ -1,7 +1,10 @@
 use derive_more::{Add, AddAssign, Neg, Sub, SubAssign};
+use serde::{Deserialize, Serialize};
 use std::ops::{Div, Mul};
 
-#[derive(Debug, Clone, Copy, Add, AddAssign, Sub, SubAssign, Neg)]
+#[derive(
+    Debug, Default, Clone, Copy, Add, AddAssign, Sub, SubAssign, Neg, Serialize, Deserialize,
+)]
 pub struct Multivector {
     pub s: f32,
     pub e0: f32,

@@ -5,6 +5,7 @@ use crate::{
     rendering::{GpuCamera, GpuCircle, GpuQuad, RenderData, RenderState},
 };
 use eframe::{egui, wgpu};
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
 pub mod evaluation;
@@ -13,7 +14,10 @@ pub mod multivector;
 pub mod parsing;
 pub mod rendering;
 
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
 struct App {
+    #[serde(skip)]
     last_time: Option<std::time::Instant>,
     info_window_open: bool,
     camera_window_open: bool,
@@ -27,60 +31,8 @@ struct App {
     variables: BTreeMap<String, Variable>,
 }
 
-pub struct Variable {
-    pub value: Multivector,
-    pub display: Option<VariableDisplay>,
-}
-
-pub struct VariableDisplay {
-    pub color: cgmath::Vector3<f32>,
-    pub layer: f32,
-}
-
-struct Camera {
-    position: cgmath::Vector2<f32>,
-    view_height: f32,
-    move_speed: f32,
-    zoom_speed: f32,
-    show_grid: bool,
-    grid_thickness: f32,
-    line_thickness: f32,
-    point_radius: f32,
-}
-
-struct Parameter {
-    name: String,
-    type_: ParameterType,
-    value: Multivector,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ParameterType {
-    Grade0,
-    Grade1,
-    Grade2,
-    Grade3,
-    Multivector,
-}
-
-impl ParameterType {
-    pub fn display_name(&self) -> &'static str {
-        match *self {
-            ParameterType::Grade0 => "Scalar",
-            ParameterType::Grade1 => "Grade 1",
-            ParameterType::Grade2 => "Grade 2",
-            ParameterType::Grade3 => "Grade 3",
-            ParameterType::Multivector => "Multivector",
-        }
-    }
-}
-
-impl App {
-    fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let renderer = cc.wgpu_render_state.as_ref().unwrap();
-        let state = RenderState::new(renderer.target_format, &renderer.device, &renderer.queue);
-        renderer.renderer.write().callback_resources.insert(state);
-
+impl Default for App {
+    fn default() -> Self {
         Self {
             last_time: None,
             info_window_open: true,
@@ -204,6 +156,73 @@ impl App {
             ]),
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Variable {
+    #[serde(default, skip)]
+    pub value: Multivector,
+    pub display: Option<VariableDisplay>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct VariableDisplay {
+    pub color: cgmath::Vector3<f32>,
+    pub layer: f32,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Camera {
+    position: cgmath::Vector2<f32>,
+    view_height: f32,
+    move_speed: f32,
+    zoom_speed: f32,
+    show_grid: bool,
+    grid_thickness: f32,
+    line_thickness: f32,
+    point_radius: f32,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Parameter {
+    name: String,
+    type_: ParameterType,
+    value: Multivector,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+enum ParameterType {
+    Grade0,
+    Grade1,
+    Grade2,
+    Grade3,
+    Multivector,
+}
+
+impl ParameterType {
+    pub fn display_name(&self) -> &'static str {
+        match *self {
+            ParameterType::Grade0 => "Scalar",
+            ParameterType::Grade1 => "Grade 1",
+            ParameterType::Grade2 => "Grade 2",
+            ParameterType::Grade3 => "Grade 3",
+            ParameterType::Multivector => "Multivector",
+        }
+    }
+}
+
+impl App {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let renderer = cc.wgpu_render_state.as_ref().unwrap();
+        let state = RenderState::new(renderer.target_format, &renderer.device, &renderer.queue);
+        renderer.renderer.write().callback_resources.insert(state);
+
+        cc.storage
+            .unwrap()
+            .get_string("App")
+            .and_then(|s| ron::from_str(&s).ok())
+            .unwrap_or_default()
+    }
 
     fn update_code(&mut self) {
         let mut assigned_variables = HashSet::new();
@@ -282,13 +301,21 @@ impl eframe::App for App {
             });
         });
 
-        egui::Window::new("Info")
-            .open(&mut self.info_window_open)
-            .resizable(false)
-            .show(ctx, |ui| {
-                ui.label(format!("FPS: {:.3}", 1.0 / dt));
-                ui.label(format!("Frame Time: {:.3}ms", 1000.0 * dt));
-            });
+        {
+            let mut reset_everything = false;
+            egui::Window::new("Info")
+                .open(&mut self.info_window_open)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.label(format!("FPS: {:.3}", 1.0 / dt));
+                    ui.label(format!("Frame Time: {:.3}ms", 1000.0 * dt));
+                    reset_everything |= ui.button("RESET EVERYTHING").clicked();
+                });
+            if reset_everything {
+                *self = Self::default();
+                return;
+            }
+        }
 
         egui::Window::new("Camera")
             .open(&mut self.camera_window_open)
@@ -638,6 +665,10 @@ impl eframe::App for App {
             });
 
         ctx.request_repaint();
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("App", ron::to_string(self).unwrap());
     }
 }
 

@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cgmath = "0.18.0"
+cgmath = { version = "0.18.0", features = ["serde"] }
 derive_more = { version = "2.0.1", features = ["full"] }
-eframe = { version = "0.31.1", features = ["persistence", "ron", "serde", "wgpu"] }
+eframe = { version = "0.31.1", features = ["persistence", "wgpu"] }
 encase = { version = "0.11.1", features = ["cgmath"] }
+ron = "0.10.1"
+serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.12"
