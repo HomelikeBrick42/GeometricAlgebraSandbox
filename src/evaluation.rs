@@ -1,19 +1,20 @@
 use crate::{
+    Variable,
     multivector::Multivector,
     parsing::{AstExpression, AstExpressionKind, BinaryOperator, UnaryOperator},
 };
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub fn evaluate_expression(
     expression: &AstExpression,
-    variables: &HashMap<String, Multivector>,
+    variables: &BTreeMap<String, Variable>,
 ) -> Result<Multivector, String> {
     Ok(match expression.kind {
         AstExpressionKind::Name {
             name,
             ref name_token,
         } => match variables.get(name) {
-            Some(value) => *value,
+            Some(variable) => variable.value,
             None => {
                 return Err(format!(
                     "{}: Unknown variable '{name}'",

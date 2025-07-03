@@ -5,7 +5,7 @@ use crate::{
     rendering::{GpuCamera, GpuCircle, GpuQuad, RenderData, RenderState},
 };
 use eframe::{egui, wgpu};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashSet};
 
 pub mod evaluation;
 pub mod lexer;
@@ -23,9 +23,18 @@ struct App {
     code_window_open: bool,
     errors: Vec<String>,
     code: String,
-    values_to_display_window_open: bool,
-    values_to_display: Vec<ValueToDisplay>,
-    variables: HashMap<String, Multivector>,
+    variables_window_open: bool,
+    variables: BTreeMap<String, Variable>,
+}
+
+pub struct Variable {
+    pub value: Multivector,
+    pub display: Option<VariableDisplay>,
+}
+
+pub struct VariableDisplay {
+    pub color: cgmath::Vector3<f32>,
+    pub layer: f32,
 }
 
 struct Camera {
@@ -64,13 +73,6 @@ impl ParameterType {
             ParameterType::Multivector => "Multivector",
         }
     }
-}
-
-struct ValueToDisplay {
-    name: String,
-    color: cgmath::Vector3<f32>,
-    layer: f32,
-    display_value: Multivector,
 }
 
 impl App {
@@ -155,48 +157,66 @@ impl App {
             code_window_open: true,
             errors: vec![],
             code: String::new(),
-            values_to_display_window_open: true,
-            values_to_display: vec![
-                ValueToDisplay {
-                    name: "e1".into(),
-                    color: cgmath::Vector3 {
-                        x: 1.0,
-                        y: 0.0,
-                        z: 0.0,
+            variables_window_open: true,
+            variables: BTreeMap::from([
+                (
+                    "e1".into(),
+                    Variable {
+                        value: Multivector::ZERO,
+                        display: Some(VariableDisplay {
+                            color: cgmath::Vector3 {
+                                x: 1.0,
+                                y: 0.0,
+                                z: 0.0,
+                            },
+                            layer: 0.0,
+                        }),
                     },
-                    layer: 0.0,
-                    display_value: Multivector::ZERO,
-                },
-                ValueToDisplay {
-                    name: "e2".into(),
-                    color: cgmath::Vector3 {
-                        x: 0.0,
-                        y: 1.0,
-                        z: 0.0,
+                ),
+                (
+                    "e2".into(),
+                    Variable {
+                        value: Multivector::ZERO,
+                        display: Some(VariableDisplay {
+                            color: cgmath::Vector3 {
+                                x: 0.0,
+                                y: 1.0,
+                                z: 0.0,
+                            },
+                            layer: 0.0,
+                        }),
                     },
-                    layer: 0.0,
-                    display_value: Multivector::ZERO,
-                },
-                ValueToDisplay {
-                    name: "e12".into(),
-                    color: cgmath::Vector3 {
-                        x: 1.0,
-                        y: 1.0,
-                        z: 1.0,
+                ),
+                (
+                    "e12".into(),
+                    Variable {
+                        value: Multivector::ZERO,
+                        display: Some(VariableDisplay {
+                            color: cgmath::Vector3 {
+                                x: 1.0,
+                                y: 1.0,
+                                z: 1.0,
+                            },
+                            layer: 0.0,
+                        }),
                     },
-                    layer: 0.0,
-                    display_value: Multivector::ZERO,
-                },
-            ],
-            variables: HashMap::new(),
+                ),
+            ]),
         }
     }
 
     fn update_code(&mut self) {
-        self.variables.clear();
+        let mut assigned_variables = HashSet::new();
+
         for parameter in &self.parameters {
             self.variables
-                .insert(parameter.name.clone(), parameter.value);
+                .entry(parameter.name.clone())
+                .or_insert_with(|| Variable {
+                    value: Multivector::ZERO,
+                    display: None,
+                })
+                .value = parameter.value;
+            assigned_variables.insert(parameter.name.as_str());
         }
 
         self.errors.clear();
@@ -221,21 +241,25 @@ impl App {
                             Ok(value) => value,
                             Err(error) => {
                                 self.errors.push(error);
-                                break 'evaluation;
+                                continue;
                             }
                         };
-                        self.variables.insert(name.into(), value);
+                        self.variables
+                            .entry(name.into())
+                            .or_insert_with(|| Variable {
+                                value: Multivector::ZERO,
+                                display: None,
+                            })
+                            .value = value;
+                        assigned_variables.insert(name);
                     }
                 }
             }
         }
 
-        for values_to_display in &mut self.values_to_display {
-            values_to_display.display_value = self
-                .variables
-                .get(&values_to_display.name)
-                .copied()
-                .unwrap_or(Multivector::ZERO);
+        if self.errors.is_empty() {
+            self.variables
+                .retain(|variable_name, _| assigned_variables.contains(variable_name.as_str()));
         }
     }
 }
@@ -254,7 +278,7 @@ impl eframe::App for App {
                 self.camera_window_open |= ui.button("Camera").clicked();
                 self.parameters_window_open |= ui.button("Parameters").clicked();
                 self.code_window_open |= ui.button("Code").clicked();
-                self.values_to_display_window_open |= ui.button("Values To Display").clicked();
+                self.variables_window_open |= ui.button("Variables Window").clicked();
             });
         });
 
@@ -428,82 +452,65 @@ impl eframe::App for App {
                     .changed();
             });
 
-        egui::Window::new("Values To Display")
-            .open(&mut self.values_to_display_window_open)
-            .resizable(true)
-            .show(ctx, |ui| {
-                if ui.button("New Value To Display").clicked() {
-                    self.values_to_display.push(ValueToDisplay {
-                        name: "unassigned".into(),
-                        color: cgmath::Vector3 {
-                            x: 1.0,
-                            y: 0.0,
-                            z: 0.0,
-                        },
-                        layer: 0.0,
-                        display_value: Multivector::ZERO,
-                    });
-                    code_or_parameters_changed |= true;
-                }
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    let mut i = 0usize;
-                    let mut delete = false;
-                    self.values_to_display.retain_mut(|value_to_display| {
-                        egui::CollapsingHeader::new(
-                            egui::RichText::new(&value_to_display.name).color(
-                                egui::Color32::from_rgb(
-                                    (value_to_display.color.x * 255.0) as u8,
-                                    (value_to_display.color.y * 255.0) as u8,
-                                    (value_to_display.color.z * 255.0) as u8,
-                                ),
-                            ),
-                        )
-                        .id_salt(i)
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label("Name:");
-                                code_or_parameters_changed |= ui
-                                    .text_edit_singleline(&mut value_to_display.name)
-                                    .changed();
-                            });
+        if code_or_parameters_changed {
+            self.update_code();
+        }
 
+        egui::Window::new("Variables")
+            .open(&mut self.variables_window_open)
+            .scroll([false, true])
+            .show(ctx, |ui| {
+                for (name, variable) in &mut self.variables {
+                    let color = variable.display.as_ref().map(|display| {
+                        egui::Color32::from_rgb(
+                            (display.color.x * 255.0) as u8,
+                            (display.color.y * 255.0) as u8,
+                            (display.color.z * 255.0) as u8,
+                        )
+                    });
+                    egui::CollapsingHeader::new(
+                        egui::RichText::new(name).color(color.unwrap_or(egui::Color32::WHITE)),
+                    )
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Display:");
+                            let mut display_enabled = variable.display.is_some();
+                            if ui.checkbox(&mut display_enabled, "").changed() {
+                                if display_enabled {
+                                    variable.display = Some(VariableDisplay {
+                                        color: cgmath::Vector3 {
+                                            x: 1.0,
+                                            y: 1.0,
+                                            z: 1.0,
+                                        },
+                                        layer: 0.0,
+                                    });
+                                } else {
+                                    variable.display = None;
+                                }
+                            }
+                        });
+
+                        if let Some(display) = &mut variable.display {
                             ui.horizontal(|ui| {
                                 ui.label("Color:");
-                                ui.color_edit_button_rgb(value_to_display.color.as_mut());
+                                ui.color_edit_button_rgb(display.color.as_mut());
                             });
 
                             ui.horizontal(|ui| {
                                 ui.label("Layer");
-                                ui.add(egui::Slider::new(&mut value_to_display.layer, 0.0..=1.0));
+                                ui.add(egui::Slider::new(&mut display.layer, 0.0..=1.0));
                             });
+                        }
 
-                            ui.collapsing("Value", |ui| {
-                                ui.add_enabled_ui(false, |ui| {
-                                    edit_multivector(
-                                        ui,
-                                        &mut value_to_display.display_value,
-                                        true,
-                                        true,
-                                        true,
-                                        true,
-                                    );
-                                });
+                        ui.collapsing("Value", |ui| {
+                            ui.add_enabled_ui(false, |ui| {
+                                edit_multivector(ui, &mut variable.value, true, true, true, true);
                             });
-
-                            delete = ui.button("Delete").clicked();
-                            code_or_parameters_changed |= delete;
                         });
-
-                        i += 1;
-                        !delete
                     });
-                    ui.allocate_space(ui.available_size());
-                });
+                }
             });
-
-        if code_or_parameters_changed {
-            self.update_code();
-        }
 
         if !ctx.wants_keyboard_input() {
             ctx.input(|i| {
@@ -580,35 +587,37 @@ impl eframe::App for App {
                     }
                 }
 
-                for value_to_display in &self.values_to_display {
-                    let line = value_to_display.display_value.grade1().normalised();
-                    if line.sqr_magnitude() > 0.0001 {
-                        quads.push(GpuQuad {
-                            position: cgmath::Vector3 {
-                                x: line.e1 * -line.e0,
-                                y: line.e2 * -line.e0,
-                                z: value_to_display.layer,
-                            },
-                            rotation: f32::atan2(-line.e1, line.e2),
-                            color: value_to_display.color,
-                            size: cgmath::Vector2 {
-                                x: 10000.0,
-                                y: self.camera.line_thickness,
-                            },
-                        });
-                    }
+                for variable in self.variables.values() {
+                    if let Some(display) = &variable.display {
+                        let line = variable.value.grade1().normalised();
+                        if line.sqr_magnitude() > 0.0001 {
+                            quads.push(GpuQuad {
+                                position: cgmath::Vector3 {
+                                    x: line.e1 * -line.e0,
+                                    y: line.e2 * -line.e0,
+                                    z: display.layer,
+                                },
+                                rotation: f32::atan2(-line.e1, line.e2),
+                                color: display.color,
+                                size: cgmath::Vector2 {
+                                    x: 10000.0,
+                                    y: self.camera.line_thickness,
+                                },
+                            });
+                        }
 
-                    let point = value_to_display.display_value.grade2();
-                    if point.sqr_magnitude() > 0.0001 {
-                        circles.push(GpuCircle {
-                            position: cgmath::Vector3 {
-                                x: -point.e02 / point.e12,
-                                y: point.e01 / point.e12,
-                                z: value_to_display.layer,
-                            },
-                            color: value_to_display.color,
-                            radius: self.camera.point_radius,
-                        });
+                        let point = variable.value.grade2();
+                        if point.sqr_magnitude() > 0.0001 {
+                            circles.push(GpuCircle {
+                                position: cgmath::Vector3 {
+                                    x: -point.e02 / point.e12,
+                                    y: point.e01 / point.e12,
+                                    z: display.layer,
+                                },
+                                color: display.color,
+                                radius: self.camera.point_radius,
+                            });
+                        }
                     }
                 }
 
