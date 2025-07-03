@@ -44,6 +44,22 @@ pub fn evaluate_expression(
                     s: operand.magnitude(),
                     ..Multivector::ZERO
                 },
+                UnaryOperator::Sin => Multivector {
+                    s: f32::sin(operand.s),
+                    ..Multivector::ZERO
+                },
+                UnaryOperator::Cos => Multivector {
+                    s: f32::cos(operand.s),
+                    ..Multivector::ZERO
+                },
+                UnaryOperator::ASin => Multivector {
+                    s: f32::asin(operand.s),
+                    ..Multivector::ZERO
+                },
+                UnaryOperator::ACos => Multivector {
+                    s: f32::acos(operand.s),
+                    ..Multivector::ZERO
+                },
             }
         }
         AstExpressionKind::Binary {

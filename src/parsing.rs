@@ -81,6 +81,10 @@ pub enum UnaryOperator {
     Reverse,
     Normalise,
     Magnitude,
+    Sin,
+    Cos,
+    ASin,
+    ACos,
 }
 
 #[derive(Debug)]
@@ -261,6 +265,74 @@ impl<'source> Parser<'source> {
                     location,
                     kind: AstExpressionKind::Unary {
                         operator: UnaryOperator::Magnitude,
+                        operator_token,
+                        operand: Box::new(operand),
+                    },
+                }
+            }
+
+            operator_token @ Token {
+                location,
+                kind: TokenKind::SinKeyword,
+            } => {
+                expect_token!(self, TokenKind::OpenParenthesis)?;
+                let operand = self.parse_expression()?;
+                expect_token!(self, TokenKind::CloseParenthesis)?;
+                AstExpression {
+                    location,
+                    kind: AstExpressionKind::Unary {
+                        operator: UnaryOperator::Sin,
+                        operator_token,
+                        operand: Box::new(operand),
+                    },
+                }
+            }
+
+            operator_token @ Token {
+                location,
+                kind: TokenKind::CosKeyword,
+            } => {
+                expect_token!(self, TokenKind::OpenParenthesis)?;
+                let operand = self.parse_expression()?;
+                expect_token!(self, TokenKind::CloseParenthesis)?;
+                AstExpression {
+                    location,
+                    kind: AstExpressionKind::Unary {
+                        operator: UnaryOperator::Cos,
+                        operator_token,
+                        operand: Box::new(operand),
+                    },
+                }
+            }
+
+            operator_token @ Token {
+                location,
+                kind: TokenKind::ASinKeyword,
+            } => {
+                expect_token!(self, TokenKind::OpenParenthesis)?;
+                let operand = self.parse_expression()?;
+                expect_token!(self, TokenKind::CloseParenthesis)?;
+                AstExpression {
+                    location,
+                    kind: AstExpressionKind::Unary {
+                        operator: UnaryOperator::ASin,
+                        operator_token,
+                        operand: Box::new(operand),
+                    },
+                }
+            }
+
+            operator_token @ Token {
+                location,
+                kind: TokenKind::ACosKeyword,
+            } => {
+                expect_token!(self, TokenKind::OpenParenthesis)?;
+                let operand = self.parse_expression()?;
+                expect_token!(self, TokenKind::CloseParenthesis)?;
+                AstExpression {
+                    location,
+                    kind: AstExpressionKind::Unary {
+                        operator: UnaryOperator::ACos,
                         operator_token,
                         operand: Box::new(operand),
                     },

@@ -40,6 +40,14 @@ pub enum TokenKind<'source> {
     NormalizeKeyword,
     #[display("magnitude")]
     MagnitudeKeyword,
+    #[display("sin")]
+    SinKeyword,
+    #[display("cos")]
+    CosKeyword,
+    #[display("asin")]
+    ASinKeyword,
+    #[display("acos")]
+    ACosKeyword,
     #[display("{_0}")]
     Number(f32),
     #[display("(")]
@@ -145,6 +153,10 @@ impl<'source> Lexer<'source> {
                         match &self.source[start_location.position..end_location.position] {
                             "normalize" => TokenKind::NormalizeKeyword,
                             "magnitude" => TokenKind::MagnitudeKeyword,
+                            "sin" => TokenKind::SinKeyword,
+                            "cos" => TokenKind::CosKeyword,
+                            "asin" => TokenKind::ASinKeyword,
+                            "acos" => TokenKind::ACosKeyword,
                             name => TokenKind::Name(name),
                         }
                     }
