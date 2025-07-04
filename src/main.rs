@@ -336,6 +336,9 @@ impl eframe::App for App {
                 ui.collapsing("Transform", |ui| {
                     edit_multivector(ui, &mut self.camera.transform, true, true, true, true);
                 });
+                if ui.button("Normalize Transform").clicked() {
+                    self.camera.transform = self.camera.transform.normalized();
+                }
                 ui.horizontal(|ui| {
                     ui.label("View Height:");
                     ui.add(egui::DragValue::new(&mut self.camera.view_height).speed(0.1));
