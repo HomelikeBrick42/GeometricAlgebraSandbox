@@ -38,6 +38,10 @@ impl Default for App {
             info_window_open: true,
             camera_window_open: true,
             camera: Camera {
+                transform: Multivector {
+                    s: 1.0,
+                    ..Multivector::ZERO
+                },
                 view_height: 10.0,
                 move_speed: 1.0,
                 zoom_speed: 2.0,
@@ -170,6 +174,7 @@ pub struct VariableDisplay {
 
 #[derive(Serialize, Deserialize)]
 struct Camera {
+    transform: Multivector,
     view_height: f32,
     move_speed: f32,
     zoom_speed: f32,
@@ -315,6 +320,9 @@ impl eframe::App for App {
             .open(&mut self.camera_window_open)
             .resizable(false)
             .show(ctx, |ui| {
+                ui.collapsing("Transform", |ui| {
+                    edit_multivector(ui, &mut self.camera.transform, true, true, true, true);
+                });
                 ui.horizontal(|ui| {
                     ui.label("View Height:");
                     ui.add(egui::DragValue::new(&mut self.camera.view_height).speed(0.1));
@@ -514,14 +522,29 @@ impl eframe::App for App {
 
         if !ctx.wants_keyboard_input() {
             ctx.input(|i| {
-                // self.camera.position.y += i.key_down(egui::Key::W) as u8 as f32
-                //     * (self.camera.move_speed * self.camera.view_height * dt);
-                // self.camera.position.y -= i.key_down(egui::Key::S) as u8 as f32
-                //     * (self.camera.move_speed * self.camera.view_height * dt);
-                // self.camera.position.x -= i.key_down(egui::Key::A) as u8 as f32
-                //     * (self.camera.move_speed * self.camera.view_height * dt);
-                // self.camera.position.x += i.key_down(egui::Key::D) as u8 as f32
-                //     * (self.camera.move_speed * self.camera.view_height * dt);
+                let mut move_direction = cgmath::Vector2 { x: 0.0, y: 0.0 };
+                move_direction.y += i.key_down(egui::Key::W) as u8 as f32;
+                move_direction.y -= i.key_down(egui::Key::S) as u8 as f32;
+                move_direction.x -= i.key_down(egui::Key::A) as u8 as f32;
+                move_direction.x += i.key_down(egui::Key::D) as u8 as f32;
+
+                let inf_point = Multivector {
+                    e1: move_direction.x,
+                    e2: move_direction.y,
+                    ..Multivector::ZERO
+                }
+                .wedge(Multivector {
+                    e0: 1.0,
+                    ..Multivector::ZERO
+                });
+
+                // points at infinity square to 0, so this is valid
+                let motor = Multivector {
+                    s: 1.0,
+                    ..inf_point * self.camera.move_speed * self.camera.view_height * dt * 0.5
+                };
+
+                self.camera.transform = motor * self.camera.transform;
 
                 self.camera.view_height += i.key_down(egui::Key::Q) as u8 as f32
                     * (self.camera.zoom_speed * self.camera.view_height * dt);
@@ -555,10 +578,7 @@ impl eframe::App for App {
                         rect,
                         RenderData {
                             camera: GpuCamera {
-                                transform: Multivector {
-                                    s: 1.0,
-                                    ..Multivector::ZERO
-                                },
+                                transform: self.camera.transform,
                                 vertical_height: self.camera.view_height,
                                 aspect,
                                 line_thickness: self.camera.line_thickness,

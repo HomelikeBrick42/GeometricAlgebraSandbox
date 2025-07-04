@@ -49,7 +49,8 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     pixel_point.e01 = input.uv.y * camera.vertical_height;
     pixel_point.e02 = - input.uv.x * camera.aspect * camera.vertical_height;
 
-    pixel_point = normalized(mul(mul(camera.transform, pixel_point), reverse(camera.transform)));
+    let camera_transform = normalized(camera.transform);
+    pixel_point = normalized(mul(mul(camera_transform, pixel_point), reverse(camera_transform)));
 
     var color: vec3<f32>;
     var depth = 0.0;
