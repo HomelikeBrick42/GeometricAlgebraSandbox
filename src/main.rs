@@ -2,7 +2,7 @@ use crate::{
     evaluation::evaluate_expression,
     multivector::Multivector,
     parsing::{AstStatementKind, parse},
-    rendering::{GpuCamera, GpuCircle, GpuQuad, RenderData, RenderState},
+    rendering::{GpuCamera, GpuObject, RenderData, RenderState},
 };
 use eframe::{egui, wgpu};
 use serde::{Deserialize, Serialize};
@@ -38,12 +38,9 @@ impl Default for App {
             info_window_open: true,
             camera_window_open: true,
             camera: Camera {
-                position: cgmath::Vector2 { x: 0.0, y: 0.0 },
                 view_height: 10.0,
                 move_speed: 1.0,
                 zoom_speed: 2.0,
-                show_grid: true,
-                grid_thickness: 0.05,
                 line_thickness: 0.1,
                 point_radius: 0.1,
             },
@@ -173,12 +170,9 @@ pub struct VariableDisplay {
 
 #[derive(Serialize, Deserialize)]
 struct Camera {
-    position: cgmath::Vector2<f32>,
     view_height: f32,
     move_speed: f32,
     zoom_speed: f32,
-    show_grid: bool,
-    grid_thickness: f32,
     line_thickness: f32,
     point_radius: f32,
 }
@@ -322,19 +316,6 @@ impl eframe::App for App {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label("Position:");
-                    ui.add(
-                        egui::DragValue::new(&mut self.camera.position.x)
-                            .speed(0.1)
-                            .prefix("x:"),
-                    );
-                    ui.add(
-                        egui::DragValue::new(&mut self.camera.position.y)
-                            .speed(0.1)
-                            .prefix("y:"),
-                    );
-                });
-                ui.horizontal(|ui| {
                     ui.label("View Height:");
                     ui.add(egui::DragValue::new(&mut self.camera.view_height).speed(0.1));
                 });
@@ -345,14 +326,6 @@ impl eframe::App for App {
                 ui.horizontal(|ui| {
                     ui.label("Zoom Speed:");
                     ui.add(egui::DragValue::new(&mut self.camera.zoom_speed).speed(0.1));
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Show Grid:");
-                    ui.checkbox(&mut self.camera.show_grid, "");
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Grid Thickness:");
-                    ui.add(egui::DragValue::new(&mut self.camera.grid_thickness).speed(0.01));
                 });
                 ui.horizontal(|ui| {
                     ui.label("Line Thickness:");
@@ -427,7 +400,7 @@ impl eframe::App for App {
                                 });
 
                                 if ui.button("Normalise").clicked() {
-                                    parameter.value = parameter.value.normalised();
+                                    parameter.value = parameter.value.normalized();
                                 }
 
                                 let (grade0, grade1, grade2, grade3) = match parameter.type_ {
@@ -541,14 +514,14 @@ impl eframe::App for App {
 
         if !ctx.wants_keyboard_input() {
             ctx.input(|i| {
-                self.camera.position.y += i.key_down(egui::Key::W) as u8 as f32
-                    * (self.camera.move_speed * self.camera.view_height * dt);
-                self.camera.position.y -= i.key_down(egui::Key::S) as u8 as f32
-                    * (self.camera.move_speed * self.camera.view_height * dt);
-                self.camera.position.x -= i.key_down(egui::Key::A) as u8 as f32
-                    * (self.camera.move_speed * self.camera.view_height * dt);
-                self.camera.position.x += i.key_down(egui::Key::D) as u8 as f32
-                    * (self.camera.move_speed * self.camera.view_height * dt);
+                // self.camera.position.y += i.key_down(egui::Key::W) as u8 as f32
+                //     * (self.camera.move_speed * self.camera.view_height * dt);
+                // self.camera.position.y -= i.key_down(egui::Key::S) as u8 as f32
+                //     * (self.camera.move_speed * self.camera.view_height * dt);
+                // self.camera.position.x -= i.key_down(egui::Key::A) as u8 as f32
+                //     * (self.camera.move_speed * self.camera.view_height * dt);
+                // self.camera.position.x += i.key_down(egui::Key::D) as u8 as f32
+                //     * (self.camera.move_speed * self.camera.view_height * dt);
 
                 self.camera.view_height += i.key_down(egui::Key::Q) as u8 as f32
                     * (self.camera.zoom_speed * self.camera.view_height * dt);
@@ -564,87 +537,15 @@ impl eframe::App for App {
                     ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
                 let aspect = rect.width() / rect.height();
 
-                let mut quads = vec![];
-                let mut circles = vec![];
-
-                if self.camera.show_grid {
-                    let view_width = self.camera.view_height * aspect;
-                    for i in 0..view_width.ceil() as usize + 2 {
-                        let position =
-                            (i as f32 - view_width * 0.5 - 1.0 + self.camera.position.x).round();
-                        quads.push(GpuQuad {
-                            position: cgmath::Vector3 {
-                                x: position,
-                                y: self.camera.position.y,
-                                z: 0.0,
-                            },
-                            rotation: 0.0,
-                            color: cgmath::Vector3 {
-                                x: 0.5,
-                                y: 0.5,
-                                z: 0.5,
-                            },
-                            size: cgmath::Vector2 {
-                                x: self.camera.grid_thickness,
-                                y: self.camera.view_height,
-                            },
-                        });
-                    }
-                    for i in 0..self.camera.view_height.ceil() as usize + 2 {
-                        let position = (i as f32 - self.camera.view_height * 0.5 - 1.0
-                            + self.camera.position.y)
-                            .round();
-                        quads.push(GpuQuad {
-                            position: cgmath::Vector3 {
-                                x: self.camera.position.x,
-                                y: position,
-                                z: 0.0,
-                            },
-                            rotation: 0.0,
-                            color: cgmath::Vector3 {
-                                x: 0.5,
-                                y: 0.5,
-                                z: 0.5,
-                            },
-                            size: cgmath::Vector2 {
-                                x: view_width,
-                                y: self.camera.grid_thickness,
-                            },
-                        });
-                    }
-                }
+                let mut objects = vec![];
 
                 for variable in self.variables.values() {
                     if let Some(display) = &variable.display {
-                        let line = variable.value.grade1().normalised();
-                        if line.sqr_magnitude() > 0.0001 {
-                            quads.push(GpuQuad {
-                                position: cgmath::Vector3 {
-                                    x: line.e1 * -line.e0,
-                                    y: line.e2 * -line.e0,
-                                    z: display.layer,
-                                },
-                                rotation: f32::atan2(-line.e1, line.e2),
-                                color: display.color,
-                                size: cgmath::Vector2 {
-                                    x: 10000.0,
-                                    y: self.camera.line_thickness,
-                                },
-                            });
-                        }
-
-                        let point = variable.value.grade2();
-                        if point.sqr_magnitude() > 0.0001 {
-                            circles.push(GpuCircle {
-                                position: cgmath::Vector3 {
-                                    x: -point.e02 / point.e12,
-                                    y: point.e01 / point.e12,
-                                    z: display.layer,
-                                },
-                                color: display.color,
-                                radius: self.camera.point_radius,
-                            });
-                        }
+                        objects.push(GpuObject {
+                            value: variable.value,
+                            color: display.color,
+                            layer: display.layer,
+                        });
                     }
                 }
 
@@ -654,12 +555,16 @@ impl eframe::App for App {
                         rect,
                         RenderData {
                             camera: GpuCamera {
-                                position: self.camera.position,
+                                transform: Multivector {
+                                    s: 1.0,
+                                    ..Multivector::ZERO
+                                },
                                 vertical_height: self.camera.view_height,
                                 aspect,
+                                line_thickness: self.camera.line_thickness,
+                                point_radius: self.camera.point_radius,
                             },
-                            quads,
-                            circles,
+                            objects,
                         },
                     ));
             });
@@ -746,7 +651,6 @@ fn main() -> eframe::Result<()> {
         eframe::NativeOptions {
             renderer: eframe::Renderer::Wgpu,
             vsync: false,
-            depth_buffer: 24,
             wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
                 present_mode: wgpu::PresentMode::AutoNoVsync,
                 ..Default::default()

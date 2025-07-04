@@ -1,9 +1,21 @@
 use derive_more::{Add, AddAssign, Neg, Sub, SubAssign};
+use encase::ShaderType;
 use serde::{Deserialize, Serialize};
 use std::ops::{Div, Mul};
 
 #[derive(
-    Debug, Default, Clone, Copy, Add, AddAssign, Sub, SubAssign, Neg, Serialize, Deserialize,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    Add,
+    AddAssign,
+    Sub,
+    SubAssign,
+    Neg,
+    Serialize,
+    Deserialize,
+    ShaderType,
 )]
 pub struct Multivector {
     pub s: f32,
@@ -171,7 +183,7 @@ impl Multivector {
         self.sqr_magnitude().sqrt()
     }
 
-    pub fn normalised(self) -> Self {
+    pub fn normalized(self) -> Self {
         let magnitude = self.magnitude();
         if magnitude >= 0.0001 {
             self / magnitude

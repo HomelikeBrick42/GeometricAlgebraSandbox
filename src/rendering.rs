@@ -1,43 +1,39 @@
+use crate::multivector::Multivector;
 use eframe::{egui, wgpu};
-use encase::{ShaderSize, ShaderType};
+use encase::{ArrayLength, ShaderSize, ShaderType};
 
 #[derive(ShaderType)]
 pub struct GpuCamera {
-    pub position: cgmath::Vector2<f32>,
+    pub transform: Multivector,
     pub vertical_height: f32,
     pub aspect: f32,
+    pub line_thickness: f32,
+    pub point_radius: f32,
 }
 
 #[derive(ShaderType)]
-pub struct GpuQuad {
-    pub position: cgmath::Vector3<f32>,
-    pub rotation: f32,
+pub struct GpuObject {
+    pub value: Multivector,
     pub color: cgmath::Vector3<f32>,
-    pub size: cgmath::Vector2<f32>,
+    pub layer: f32,
 }
 
 #[derive(ShaderType)]
-pub struct GpuCircle {
-    pub position: cgmath::Vector3<f32>,
-    pub color: cgmath::Vector3<f32>,
-    pub radius: f32,
+struct GpuObjects<'a> {
+    count: ArrayLength,
+    #[size(runtime)]
+    data: &'a Vec<GpuObject>,
 }
 
 pub struct RenderState {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
 
-    quads_buffer: wgpu::Buffer,
-    quads_bind_group_layout: wgpu::BindGroupLayout,
-    quads_bind_group: wgpu::BindGroup,
+    objects_buffer: wgpu::Buffer,
+    objects_bind_group_layout: wgpu::BindGroupLayout,
+    objects_bind_group: wgpu::BindGroup,
 
-    quad_render_pipeline: wgpu::RenderPipeline,
-
-    circles_buffer: wgpu::Buffer,
-    circles_bind_group_layout: wgpu::BindGroupLayout,
-    circles_bind_group: wgpu::BindGroup,
-
-    circle_render_pipeline: wgpu::RenderPipeline,
+    objects_render_pipeline: wgpu::RenderPipeline,
 }
 
 impl RenderState {
@@ -57,7 +53,7 @@ impl RenderState {
                 label: Some("Camera Bind Group Layout"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -75,131 +71,49 @@ impl RenderState {
             }],
         });
 
-        let quads_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Quads Buffer"),
-            size: GpuQuad::SHADER_SIZE.get(),
+        let objects_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Objects Buffer"),
+            size: GpuObjects::min_size().get(),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let quads_bind_group_layout =
+        let objects_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Quads Bind Group Layout"),
+                label: Some("Objects Bind Group Layout"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: Some(GpuQuad::SHADER_SIZE),
+                        min_binding_size: Some(GpuObjects::min_size()),
                     },
                     count: None,
                 }],
             });
-        let quads_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Quads Bind Group"),
-            layout: &quads_bind_group_layout,
+        let objects_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Objects Bind Group"),
+            layout: &objects_bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: quads_buffer.as_entire_binding(),
+                resource: objects_buffer.as_entire_binding(),
             }],
         });
 
-        let quad_shader = device.create_shader_module(wgpu::include_wgsl!("./quad_shader.wgsl"));
+        let objects_shader = device.create_shader_module(wgpu::include_wgsl!("./objects.wgsl"));
 
-        let quad_render_pipeline_layout =
+        let objects_render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Quad Render Pipeline Layout"),
-                bind_group_layouts: &[&camera_bind_group_layout, &quads_bind_group_layout],
+                label: Some("Objects Render Pipeline Layout"),
+                bind_group_layouts: &[&camera_bind_group_layout, &objects_bind_group_layout],
                 push_constant_ranges: &[],
             });
-        let quad_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Quad Render Pipeline"),
-            layout: Some(&quad_render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &quad_shader,
-                entry_point: Some("vertex"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[],
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleStrip,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Cw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth24Plus,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::LessEqual,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &quad_shader,
-                entry_point: Some("fragment"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview: None,
-            cache: None,
-        });
-
-        let circles_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Circles Buffer"),
-            size: GpuCircle::SHADER_SIZE.get(),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let circles_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Circles Bind Group Layout"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(GpuCircle::SHADER_SIZE),
-                    },
-                    count: None,
-                }],
-            });
-        let circles_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Circles Bind Group"),
-            layout: &circles_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: circles_buffer.as_entire_binding(),
-            }],
-        });
-
-        let circle_shader =
-            device.create_shader_module(wgpu::include_wgsl!("./circle_shader.wgsl"));
-
-        let circle_render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Circle Render Pipeline Layout"),
-                bind_group_layouts: &[&camera_bind_group_layout, &circles_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-        let circle_render_pipeline =
+        let objects_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Circle Render Pipeline"),
-                layout: Some(&circle_render_pipeline_layout),
+                label: Some("Objects Render Pipeline"),
+                layout: Some(&objects_render_pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &circle_shader,
+                    module: &objects_shader,
                     entry_point: Some("vertex"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[],
@@ -213,20 +127,14 @@ impl RenderState {
                     polygon_mode: wgpu::PolygonMode::Fill,
                     conservative: false,
                 },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth24Plus,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::LessEqual,
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
+                depth_stencil: None,
                 multisample: wgpu::MultisampleState {
                     count: 1,
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &circle_shader,
+                    module: &objects_shader,
                     entry_point: Some("fragment"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
@@ -243,25 +151,18 @@ impl RenderState {
             camera_buffer,
             camera_bind_group,
 
-            quads_buffer,
-            quads_bind_group_layout,
-            quads_bind_group,
+            objects_buffer,
+            objects_bind_group_layout,
+            objects_bind_group,
 
-            quad_render_pipeline,
-
-            circles_buffer,
-            circles_bind_group_layout,
-            circles_bind_group,
-
-            circle_render_pipeline,
+            objects_render_pipeline,
         }
     }
 }
 
 pub struct RenderData {
     pub camera: GpuCamera,
-    pub quads: Vec<GpuQuad>,
-    pub circles: Vec<GpuCircle>,
+    pub objects: Vec<GpuObject>,
 }
 
 impl eframe::egui_wgpu::CallbackTrait for RenderData {
@@ -285,56 +186,34 @@ impl eframe::egui_wgpu::CallbackTrait for RenderData {
         }
 
         {
-            let size = self.quads.size();
-            if size.get() > state.quads_buffer.size() {
-                state.quads_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Quads Buffer"),
+            let objects = GpuObjects {
+                count: ArrayLength,
+                data: &self.objects,
+            };
+
+            let size = objects.size();
+            if size.get() > state.objects_buffer.size() {
+                state.objects_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Objects Buffer"),
                     size: size.get(),
                     usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 });
-                state.quads_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("Quads Bind Group"),
-                    layout: &state.quads_bind_group_layout,
+                state.objects_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Objects Bind Group"),
+                    layout: &state.objects_bind_group_layout,
                     entries: &[wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: state.quads_buffer.as_entire_binding(),
+                        resource: state.objects_buffer.as_entire_binding(),
                     }],
                 });
             }
 
-            let mut quads_buffer = queue
-                .write_buffer_with(&state.quads_buffer, 0, size)
+            let mut objects_buffer = queue
+                .write_buffer_with(&state.objects_buffer, 0, size)
                 .unwrap();
-            encase::StorageBuffer::new(&mut *quads_buffer)
-                .write(&self.quads)
-                .unwrap();
-        }
-
-        {
-            let size = self.circles.size();
-            if size.get() > state.circles_buffer.size() {
-                state.circles_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Circles Buffer"),
-                    size: size.get(),
-                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-                state.circles_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("Circles Bind Group"),
-                    layout: &state.circles_bind_group_layout,
-                    entries: &[wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: state.circles_buffer.as_entire_binding(),
-                    }],
-                });
-            }
-
-            let mut circles_buffer = queue
-                .write_buffer_with(&state.circles_buffer, 0, size)
-                .unwrap();
-            encase::StorageBuffer::new(&mut *circles_buffer)
-                .write(&self.circles)
+            encase::StorageBuffer::new(&mut *objects_buffer)
+                .write(&objects)
                 .unwrap();
         }
 
@@ -349,14 +228,9 @@ impl eframe::egui_wgpu::CallbackTrait for RenderData {
     ) {
         let state: &RenderState = callback_resources.get().unwrap();
 
-        render_pass.set_pipeline(&state.quad_render_pipeline);
+        render_pass.set_pipeline(&state.objects_render_pipeline);
         render_pass.set_bind_group(0, &state.camera_bind_group, &[]);
-        render_pass.set_bind_group(1, &state.quads_bind_group, &[]);
-        render_pass.draw(0..4, 0..self.quads.len() as _);
-
-        render_pass.set_pipeline(&state.circle_render_pipeline);
-        render_pass.set_bind_group(0, &state.camera_bind_group, &[]);
-        render_pass.set_bind_group(1, &state.circles_bind_group, &[]);
-        render_pass.draw(0..4, 0..self.circles.len() as _);
+        render_pass.set_bind_group(1, &state.objects_bind_group, &[]);
+        render_pass.draw(0..4, 0..1);
     }
 }

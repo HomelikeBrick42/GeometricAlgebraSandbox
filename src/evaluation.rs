@@ -39,7 +39,7 @@ pub fn evaluate_expression(
                 UnaryOperator::Negate => -operand,
                 UnaryOperator::Dual => operand.dual(),
                 UnaryOperator::Reverse => operand.reverse(),
-                UnaryOperator::Normalise => operand.normalised(),
+                UnaryOperator::Normalise => operand.normalized(),
                 UnaryOperator::Magnitude => Multivector {
                     s: operand.magnitude(),
                     ..Multivector::ZERO
