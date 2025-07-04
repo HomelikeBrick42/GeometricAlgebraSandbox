@@ -8,7 +8,7 @@ use eframe::{egui, wgpu};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicU8, Ordering},
 };
 
 pub mod evaluation;
@@ -17,7 +17,7 @@ pub mod multivector;
 pub mod parsing;
 pub mod rendering;
 
-static HYPERBOLIC: AtomicBool = AtomicBool::new(false);
+static GA_FLAVOUR: AtomicU8 = AtomicU8::new(0);
 
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
@@ -221,8 +221,15 @@ impl App {
         let state = RenderState::new(renderer.target_format, &renderer.device, &renderer.queue);
         renderer.renderer.write().callback_resources.insert(state);
 
-        cc.storage
-            .unwrap()
+        let storage = cc.storage.unwrap();
+
+        let flavour = storage
+            .get_string("Flavour")
+            .and_then(|s| ron::from_str(&s).ok())
+            .unwrap_or_default();
+        GA_FLAVOUR.store(flavour, Ordering::Relaxed);
+
+        storage
             .get_string("App")
             .and_then(|s| ron::from_str(&s).ok())
             .unwrap_or_default()
@@ -317,6 +324,7 @@ impl eframe::App for App {
                 });
             if reset_everything {
                 *self = Self::default();
+                GA_FLAVOUR.store(0, Ordering::Relaxed);
                 return;
             }
         }
@@ -349,10 +357,27 @@ impl eframe::App for App {
                     ui.add(egui::DragValue::new(&mut self.camera.point_radius).speed(0.01));
                 });
                 ui.horizontal(|ui| {
-                    ui.label("Hyperbolic:");
-                    let mut hyperbolic = HYPERBOLIC.load(Ordering::Relaxed);
-                    if ui.checkbox(&mut hyperbolic, "").changed() {
-                        HYPERBOLIC.store(hyperbolic, Ordering::Relaxed);
+                    ui.label("Flavour:");
+                    let mut flavour = GA_FLAVOUR.load(Ordering::Relaxed);
+                    let name = |flavour: u8| match flavour {
+                        0 => "Euclidean",
+                        1 => "Hyperbolic",
+                        2 => "Spherical",
+                        _ => unreachable!(),
+                    };
+                    if egui::ComboBox::from_id_salt("flavour")
+                        .selected_text(name(flavour))
+                        .show_ui(ui, |ui| {
+                            let mut changed = false;
+                            changed |= ui.selectable_value(&mut flavour, 0, name(0)).changed();
+                            changed |= ui.selectable_value(&mut flavour, 1, name(1)).changed();
+                            changed |= ui.selectable_value(&mut flavour, 2, name(2)).changed();
+                            changed
+                        })
+                        .inner
+                        .unwrap_or(false)
+                    {
+                        GA_FLAVOUR.store(flavour, Ordering::Relaxed);
                     }
                 });
             });
@@ -594,7 +619,7 @@ impl eframe::App for App {
                                 aspect,
                                 line_thickness: self.camera.line_thickness,
                                 point_radius: self.camera.point_radius,
-                                hyperbolic: HYPERBOLIC.load(Ordering::Relaxed) as u32,
+                                flavour: GA_FLAVOUR.load(Ordering::Relaxed) as u32,
                             },
                             objects,
                         },
@@ -606,6 +631,10 @@ impl eframe::App for App {
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string("App", ron::to_string(self).unwrap());
+        storage.set_string(
+            "Flavour",
+            ron::to_string(&GA_FLAVOUR.load(Ordering::Relaxed)).unwrap(),
+        );
     }
 }
 

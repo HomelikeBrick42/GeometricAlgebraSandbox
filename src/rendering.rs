@@ -9,7 +9,7 @@ pub struct GpuCamera {
     pub aspect: f32,
     pub line_thickness: f32,
     pub point_radius: f32,
-    pub hyperbolic: u32,
+    pub flavour: u32,
 }
 
 #[derive(ShaderType)]
