@@ -339,26 +339,30 @@ impl eframe::App for App {
                 if ui.button("Normalize Transform").clicked() {
                     self.camera.transform = self.camera.transform.normalized();
                 }
-                ui.horizontal(|ui| {
-                    ui.label("View Height:");
-                    ui.add(egui::DragValue::new(&mut self.camera.view_height).speed(0.1));
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Move Speed:");
-                    ui.add(egui::DragValue::new(&mut self.camera.move_speed).speed(0.1));
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Zoom Speed:");
-                    ui.add(egui::DragValue::new(&mut self.camera.zoom_speed).speed(0.1));
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Line Thickness:");
-                    ui.add(egui::DragValue::new(&mut self.camera.line_thickness).speed(0.01));
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Point Radius:");
-                    ui.add(egui::DragValue::new(&mut self.camera.point_radius).speed(0.01));
-                });
+                egui::Grid::new("CameraGrid")
+                    .num_columns(2)
+                    .spacing([3.0, 2.0])
+                    .show(ui, |ui| {
+                        ui.label("View Height:");
+                        ui.add(egui::DragValue::new(&mut self.camera.view_height).speed(0.1));
+                        ui.end_row();
+
+                        ui.label("Move Speed:");
+                        ui.add(egui::DragValue::new(&mut self.camera.move_speed).speed(0.1));
+                        ui.end_row();
+
+                        ui.label("Zoom Speed:");
+                        ui.add(egui::DragValue::new(&mut self.camera.zoom_speed).speed(0.1));
+                        ui.end_row();
+
+                        ui.label("Line Thickness:");
+                        ui.add(egui::DragValue::new(&mut self.camera.line_thickness).speed(0.01));
+                        ui.end_row();
+
+                        ui.label("Point Radius:");
+                        ui.add(egui::DragValue::new(&mut self.camera.point_radius).speed(0.01));
+                        ui.end_row();
+                    });
                 ui.horizontal(|ui| {
                     ui.label("Flavour:");
                     let mut flavour = GA_FLAVOUR.load(Ordering::Relaxed);
@@ -385,10 +389,13 @@ impl eframe::App for App {
                 });
             });
 
-        egui::Window::new("Parameters")
-            .open(&mut self.parameters_window_open)
+        egui::SidePanel::left("Parameters")
             .resizable(true)
             .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.heading("Parameters");
+                });
+                ui.separator();
                 if ui.button("New Parameter").clicked() {
                     self.parameters.push(Parameter {
                         name: "unnamed".into(),
@@ -504,10 +511,13 @@ impl eframe::App for App {
             self.update_code();
         }
 
-        egui::Window::new("Variables")
-            .open(&mut self.variables_window_open)
-            .scroll([false, true])
+        egui::SidePanel::right("Variables")
+            .resizable(true)
             .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.heading("Variables");
+                });
+                ui.separator();
                 for (name, variable) in &mut self.variables {
                     let color = variable.display.as_ref().map(|display| {
                         egui::Color32::from_rgb(
@@ -558,6 +568,7 @@ impl eframe::App for App {
                         });
                     });
                 }
+                ui.allocate_space(ui.available_size());
             });
 
         if !ctx.wants_keyboard_input() {
@@ -589,6 +600,8 @@ impl eframe::App for App {
                     * (self.camera.zoom_speed * self.camera.view_height * dt);
                 self.camera.view_height -= i.key_down(egui::Key::E) as u8 as f32
                     * (self.camera.zoom_speed * self.camera.view_height * dt);
+                self.camera.view_height -=
+                    i.raw_scroll_delta.y * (self.camera.zoom_speed * self.camera.view_height) * 0.0025;
             });
         }
 
@@ -650,62 +663,64 @@ fn edit_multivector(
     grade3: bool,
 ) -> bool {
     let mut changed = false;
-    if grade0 {
-        ui.horizontal(|ui| {
-            ui.label("Scalar:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut value.s).speed(0.1))
-                .changed();
+
+    egui::Grid::new("MultiVector")
+        .num_columns(2)
+        .spacing([3.0, 2.0])
+        .show(ui, |ui| {
+            if grade0 {
+                ui.label("Scalar:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut value.s).speed(0.1))
+                    .changed();
+                ui.end_row();
+            }
+            if grade1 {
+                ui.label("e0:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut value.e0).speed(0.1))
+                    .changed();
+                ui.end_row();
+
+                ui.label("e1:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut value.e1).speed(0.1))
+                    .changed();
+                ui.end_row();
+
+                ui.label("e2:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut value.e2).speed(0.1))
+                    .changed();
+                ui.end_row();
+            }
+            if grade2 {
+                ui.label("e01:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut value.e01).speed(0.1))
+                    .changed();
+                ui.end_row();
+
+                ui.label("e02:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut value.e02).speed(0.1))
+                    .changed();
+                ui.end_row();
+
+                ui.label("e12:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut value.e12).speed(0.1))
+                    .changed();
+                ui.end_row();
+            }
+            if grade3 {
+                ui.label("e012:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut value.e012).speed(0.1))
+                    .changed();
+                ui.end_row();
+            }
         });
-    }
-    if grade1 {
-        ui.horizontal(|ui| {
-            ui.label("e0:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut value.e0).speed(0.1))
-                .changed();
-        });
-        ui.horizontal(|ui| {
-            ui.label("e1:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut value.e1).speed(0.1))
-                .changed();
-        });
-        ui.horizontal(|ui| {
-            ui.label("e2:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut value.e2).speed(0.1))
-                .changed();
-        });
-    }
-    if grade2 {
-        ui.horizontal(|ui| {
-            ui.label("e01:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut value.e01).speed(0.1))
-                .changed();
-        });
-        ui.horizontal(|ui| {
-            ui.label("e02:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut value.e02).speed(0.1))
-                .changed();
-        });
-        ui.horizontal(|ui| {
-            ui.label("e12:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut value.e12).speed(0.1))
-                .changed();
-        });
-    }
-    if grade3 {
-        ui.horizontal(|ui| {
-            ui.label("e012:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut value.e012).speed(0.1))
-                .changed();
-        });
-    }
     changed
 }
 
@@ -715,6 +730,7 @@ fn main() -> eframe::Result<()> {
         eframe::NativeOptions {
             renderer: eframe::Renderer::Wgpu,
             vsync: false,
+            multisampling: 4,
             wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
                 present_mode: wgpu::PresentMode::AutoNoVsync,
                 ..Default::default()
