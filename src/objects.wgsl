@@ -55,7 +55,7 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     e0.e0 = 1.0;
 
     let inf_point = wedge(pixel_line, e0);
-    let pixel_rotor = normalized(mexp(muls(inf_point, pixel_distance * camera.vertical_height * 0.5)));
+    let pixel_rotor = normalized(mexp(muls(inf_point, pixel_distance * camera.vertical_height * 0.25)));
 
     var pixel_point: Multivector;
     pixel_point.e12 = 1.0;
