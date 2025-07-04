@@ -150,7 +150,7 @@ impl Default for App {
                                 y: 1.0,
                                 z: 1.0,
                             },
-                            layer: 0.0,
+                            layer: 0.01,
                         }),
                     },
                 ),
@@ -491,7 +491,7 @@ impl eframe::App for App {
                                             y: 1.0,
                                             z: 1.0,
                                         },
-                                        layer: 0.0,
+                                        layer: 0.05,
                                     });
                                 } else {
                                     variable.display = None;
