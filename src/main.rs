@@ -543,7 +543,7 @@ impl eframe::App for App {
                         * (self.camera.move_speed * self.camera.view_height * dt * 0.5),
                 );
 
-                self.camera.transform = motor * self.camera.transform;
+                self.camera.transform = self.camera.transform * motor;
 
                 self.camera.view_height += i.key_down(egui::Key::Q) as u8 as f32
                     * (self.camera.zoom_speed * self.camera.view_height * dt);

@@ -44,13 +44,24 @@ fn vertex(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
+    let pixel_distance = length(input.uv);
+    let pixel_direction = input.uv / pixel_distance;
+
+    var pixel_line: Multivector;
+    pixel_line.e1 = pixel_direction.x * camera.aspect;
+    pixel_line.e2 = pixel_direction.y;
+
+    var e0: Multivector;
+    e0.e0 = 1.0;
+
+    let inf_point = wedge(pixel_line, e0);
+    let point_rotor = normalized(mexp(muls(inf_point, pixel_distance * camera.vertical_height * 0.5)));
+
     var pixel_point: Multivector;
     pixel_point.e12 = 1.0;
-    pixel_point.e01 = input.uv.y * camera.vertical_height;
-    pixel_point.e02 = - input.uv.x * camera.aspect * camera.vertical_height;
 
-    let camera_transform = normalized(camera.transform);
-    pixel_point = normalized(mul(mul(camera_transform, pixel_point), reverse(camera_transform)));
+    let transform = mul(normalized(camera.transform), point_rotor);
+    pixel_point = normalized(mul(mul(transform, pixel_point), reverse(transform)));
 
     var color: vec3<f32>;
     var depth = 0.0;
@@ -225,6 +236,27 @@ fn normalized(m: Multivector) -> Multivector {
     else {
         return m;
     }
+}
+
+fn mexp(m: Multivector) -> Multivector {
+    var result: Multivector;
+
+    let squared = mul(m, m).s;
+    if squared < 0.0 {
+        let magnitude = magnitude(m);
+        result.s = cos(magnitude);
+        result = add(result, muls(m, sin(magnitude) / magnitude));
+    }
+    else if squared > 0.0 {
+        let magnitude = magnitude(m);
+        result.s = cosh(magnitude);
+        result = add(result, muls(m, sinh(magnitude) / magnitude));
+    }
+    else {
+        result.s = 1.0;
+        result = add(result, m);
+    }
+    return result;
 }
 
 fn add(left: Multivector, right: Multivector) -> Multivector {
