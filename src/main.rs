@@ -730,7 +730,6 @@ fn main() -> eframe::Result<()> {
         eframe::NativeOptions {
             renderer: eframe::Renderer::Wgpu,
             vsync: false,
-            multisampling: 4,
             wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
                 present_mode: wgpu::PresentMode::AutoNoVsync,
                 ..Default::default()
