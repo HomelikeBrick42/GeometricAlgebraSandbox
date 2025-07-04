@@ -60,6 +60,7 @@ pub fn evaluate_expression(
                     s: f32::acos(operand.s),
                     ..Multivector::ZERO
                 },
+                UnaryOperator::Exp => operand.exp(),
             }
         }
         AstExpressionKind::Binary {

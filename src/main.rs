@@ -538,11 +538,10 @@ impl eframe::App for App {
                     ..Multivector::ZERO
                 });
 
-                // points at infinity square to 0, so this is valid
-                let motor = Multivector {
-                    s: 1.0,
-                    ..inf_point * self.camera.move_speed * self.camera.view_height * dt * 0.5
-                };
+                let motor = Multivector::exp(
+                    inf_point.normalized()
+                        * (self.camera.move_speed * self.camera.view_height * dt * 0.5),
+                );
 
                 self.camera.transform = motor * self.camera.transform;
 

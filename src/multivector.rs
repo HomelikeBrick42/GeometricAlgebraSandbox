@@ -180,15 +180,40 @@ impl Multivector {
     }
 
     pub fn magnitude(self) -> f32 {
-        self.sqr_magnitude().sqrt()
+        self.sqr_magnitude().abs().sqrt()
     }
 
     pub fn normalized(self) -> Self {
         let magnitude = self.magnitude();
-        if magnitude >= 0.0001 {
+        if magnitude > 0.0 {
             self / magnitude
         } else {
             self
+        }
+    }
+
+    pub fn exp(self) -> Self {
+        match (self * self).s.total_cmp(&0.0) {
+            std::cmp::Ordering::Less => {
+                let magnitude = self.magnitude();
+                Multivector {
+                    s: magnitude.cos(),
+                    ..Self::ZERO
+                } + (self / magnitude) * magnitude.sin()
+            }
+            std::cmp::Ordering::Equal => {
+                Multivector {
+                    s: 1.0,
+                    ..Self::ZERO
+                } + self
+            }
+            std::cmp::Ordering::Greater => {
+                let magnitude = self.magnitude();
+                Multivector {
+                    s: magnitude.cosh(),
+                    ..Self::ZERO
+                } + (self / magnitude) * magnitude.sinh()
+            }
         }
     }
 }

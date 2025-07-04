@@ -214,12 +214,12 @@ fn sqr_magnitude(m: Multivector) -> f32 {
 }
 
 fn magnitude(m: Multivector) -> f32 {
-    return sqrt(sqr_magnitude(m));
+    return sqrt(abs(sqr_magnitude(m)));
 }
 
 fn normalized(m: Multivector) -> Multivector {
     let magnitude = magnitude(m);
-    if magnitude >= 0.0001 {
+    if magnitude > 0.0 {
         return muls(m, 1.0 / magnitude);
     }
     else {

@@ -48,6 +48,8 @@ pub enum TokenKind<'source> {
     ASinKeyword,
     #[display("acos")]
     ACosKeyword,
+    #[display("exp")]
+    ExpKeyword,
     #[display("{_0}")]
     Number(f32),
     #[display("(")]
@@ -157,6 +159,7 @@ impl<'source> Lexer<'source> {
                             "cos" => TokenKind::CosKeyword,
                             "asin" => TokenKind::ASinKeyword,
                             "acos" => TokenKind::ACosKeyword,
+                            "exp" => TokenKind::ExpKeyword,
                             name => TokenKind::Name(name),
                         }
                     }

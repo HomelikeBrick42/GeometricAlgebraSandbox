@@ -85,6 +85,7 @@ pub enum UnaryOperator {
     Cos,
     ASin,
     ACos,
+    Exp,
 }
 
 #[derive(Debug)]
@@ -333,6 +334,23 @@ impl<'source> Parser<'source> {
                     location,
                     kind: AstExpressionKind::Unary {
                         operator: UnaryOperator::ACos,
+                        operator_token,
+                        operand: Box::new(operand),
+                    },
+                }
+            }
+
+            operator_token @ Token {
+                location,
+                kind: TokenKind::ExpKeyword,
+            } => {
+                expect_token!(self, TokenKind::OpenParenthesis)?;
+                let operand = self.parse_expression()?;
+                expect_token!(self, TokenKind::CloseParenthesis)?;
+                AstExpression {
+                    location,
+                    kind: AstExpressionKind::Unary {
+                        operator: UnaryOperator::Exp,
                         operator_token,
                         operand: Box::new(operand),
                     },
