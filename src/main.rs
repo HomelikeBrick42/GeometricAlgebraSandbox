@@ -6,13 +6,18 @@ use crate::{
 };
 use eframe::{egui, wgpu};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 pub mod evaluation;
 pub mod lexer;
 pub mod multivector;
 pub mod parsing;
 pub mod rendering;
+
+static HYPERBOLIC: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
@@ -343,6 +348,13 @@ impl eframe::App for App {
                     ui.label("Point Radius:");
                     ui.add(egui::DragValue::new(&mut self.camera.point_radius).speed(0.01));
                 });
+                ui.horizontal(|ui| {
+                    ui.label("Hyperbolic:");
+                    let mut hyperbolic = HYPERBOLIC.load(Ordering::Relaxed);
+                    if ui.checkbox(&mut hyperbolic, "").changed() {
+                        HYPERBOLIC.store(hyperbolic, Ordering::Relaxed);
+                    }
+                });
             });
 
         egui::Window::new("Parameters")
@@ -582,6 +594,7 @@ impl eframe::App for App {
                                 aspect,
                                 line_thickness: self.camera.line_thickness,
                                 point_radius: self.camera.point_radius,
+                                hyperbolic: HYPERBOLIC.load(Ordering::Relaxed) as u32,
                             },
                             objects,
                         },
